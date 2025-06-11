@@ -1,6 +1,6 @@
 module.exports = {
-    base: '/learn-wgpu/',
-    title: 'Learn Wgpu',
+    base: '/learn-wgpu-ko/',
+    title: 'WGPU 학습하기',
     theme: 'thindark',
     plugins: {
         'vuepress-plugin-code-copy': true,
@@ -10,7 +10,7 @@ module.exports = {
         },
     },
     themeConfig: {
-        domain: '/learn-wgpu',
+        domain: '/learn-wgpu-ko',
         author: {
             name: 'Benjamin Hansen',
             twitter: 'https://twitter.com/sotrh760',
@@ -20,7 +20,7 @@ module.exports = {
         sidebar: [
             '/',
             {
-                title: 'Beginner',
+                title: '초보자',
                 collapsable: false,
                 children: [
                     '/beginner/tutorial1-window/',
@@ -35,7 +35,7 @@ module.exports = {
                 ],
             },
             {
-                title: 'Intermediate',
+                title: '중급자',
                 collapsable: false,
                 children: [
                     '/intermediate/tutorial10-lighting/',
@@ -45,7 +45,7 @@ module.exports = {
                 ],
             },
             {
-                title: 'Showcase',
+                title: '쇼케이스',
                 collapsable: true,
                 children: [
                     '/showcase/',
@@ -57,7 +57,7 @@ module.exports = {
                 ]
             },
             {
-                title: 'News',
+                title: '뉴스',
                 collapsable: true,
                 children: [
                     '/news/25.0/',
