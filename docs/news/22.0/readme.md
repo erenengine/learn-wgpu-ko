@@ -1,17 +1,7 @@
-# First Major Version! (22.0)
+# 첫 번째 메이저 버전! (22.0)
 
-Theres only a few things here. First all the shader related config
-structs now have a `compilation_options` field. For now I'm just leaving
-it as `Default::default()`, but if you have specific compilation
-needs it's there for you.
+이번 업데이트에는 몇 가지 내용이 있습니다. 우선, 모든 셰이더 관련 구성 구조체(config struct)에 `compilation_options` 필드가 추가되었습니다. 현재로서는 `Default::default()`로 남겨두었지만, 특별한 컴파일 요구사항이 있다면 이 필드를 사용하시면 됩니다.
 
-The next thing is `RenderPipelineDescriptor` and `ComputePipelineDescriptor`
-now have a `cache` field. This allows you to supply a cache to use during
-shader compilation. This is only really useful for Android devices as most
-desktop hardware/drivers provide caching. I've left it as `None` for now.
+다음으로, `RenderPipelineDescriptor`와 `ComputePipelineDescriptor`에 `cache` 필드가 추가되었습니다. 이 필드를 통해 셰이더 컴파일 중에 사용할 캐시를 제공할 수 있습니다. 대부분의 데스크톱 하드웨어/드라이버는 자체적으로 캐싱을 제공하므로, 이 기능은 안드로이드 기기에서 특히 유용합니다. 이 값은 일단 `None`으로 남겨두었습니다.
 
-`DeviceDescriptor` now has a `memory_hint` field. You can use this to ask
-the gpu to prioritize performance, memory usage, or allow you to request
-a custom memory block size. These are just hints though and the hardware
-has the final say in how to do things. I've left this as `Default::default()`
-for now.
+`DeviceDescriptor`에는 `memory_hint` 필드가 추가되었습니다. 이 필드를 사용하여 GPU에 성능이나 메모리 사용량을 우선시하도록 요청하거나, 커스텀 메모리 블록 크기를 지정할 수 있습니다. 하지만 이것들은 힌트(hint)일 뿐이며, 실제 동작 방식에 대한 최종 결정은 하드웨어가 내립니다. 이 값 또한 현재는 `Default::default()`로 남겨두었습니다.

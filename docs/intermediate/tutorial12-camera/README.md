@@ -1,8 +1,8 @@
-# A Better Camera
+# 더 나은 카메라
 
-I've been putting this off for a while. Implementing a camera isn't specifically related to using WGPU properly, but it's been bugging me, so let's do it.
+이 작업을 한동안 미뤄왔습니다. 카메라를 구현하는 것이 WGPU를 올바르게 사용하는 것과 특별히 관련이 있는 것은 아니지만, 계속 신경이 쓰여서 이제는 해야겠습니다.
 
-`lib.rs` is getting a little crowded, so let's create a `camera.rs` file to put our camera code. The first things we're going to put in it are some imports and our `OPENGL_TO_WGPU_MATRIX`.
+`lib.rs`가 조금 복잡해지고 있으니, 카메라 코드를 넣을 `camera.rs` 파일을 만듭시다. 가장 먼저 몇 가지 `use` 구문과 `OPENGL_TO_WGPU_MATRIX`를 추가하겠습니다.
 
 ```rust
 use cgmath::*;
@@ -24,7 +24,7 @@ const SAFE_FRAC_PI_2: f32 = FRAC_PI_2 - 0.0001;
 
 <div class="note">
 
-`std::time::Instant` panics on WASM, so we'll use the [instant crate](https://docs.rs/instant). You'll want to include it in your `Cargo.toml`:
+`std::time::Instant`는 WASM에서 패닉을 일으키므로, [instant 크레이트](https://docs.rs/instant)를 사용하겠습니다. `Cargo.toml`에 이 크레이트를 추가해야 합니다:
 
 ```toml
 [dependencies]
@@ -37,9 +37,9 @@ instant = { version = "0.1", features = [ "wasm-bindgen" ] }
 
 </div>
 
-## The Camera
+## 카메라
 
-Next, we need to create a new `Camera` struct. We're going to be using an FPS-style camera, so we'll store the position and the yaw (horizontal rotation), and pitch (vertical rotation). We'll have a `calc_matrix` method to create our view matrix.
+다음으로, 새로운 `Camera` 구조체를 만들어야 합니다. FPS 스타일 카메라를 사용할 것이므로, 위치(position)와 요(yaw, 수평 회전), 피치(pitch, 수직 회전)를 저장할 것입니다. 뷰 행렬(view matrix)을 생성하기 위한 `calc_matrix` 메서드를 가집니다.
 
 ```rust
 #[derive(Debug)]
@@ -83,9 +83,9 @@ impl Camera {
 }
 ```
 
-## The Projection
+## 투영(Projection)
 
-I've decided to split the projection from the camera. The projection only needs to change if the window resizes, so let's create a `Projection` struct.
+카메라에서 투영(projection)을 분리하기로 했습니다. 투영은 창 크기가 조절될 때만 변경하면 되므로, `Projection` 구조체를 만듭시다.
 
 ```rust
 pub struct Projection {
@@ -121,15 +121,15 @@ impl Projection {
 }
 ```
 
-One thing to note: `cgmath` currently returns a right-handed projection matrix from the `perspective` function. This means that the z-axis points out of the screen. If you want the z-axis to be *into* the screen (aka. a left-handed projection matrix), you'll have to code your own.
+한 가지 주목할 점: `cgmath`는 현재 `perspective` 함수에서 오른손 좌표계(right-handed) 투영 행렬을 반환합니다. 이는 z축이 화면 밖으로 나오는 방향을 의미합니다. 만약 z축이 화면 *안으로* 들어가는 방향(즉, 왼손 좌표계 투영 행렬)을 원한다면, 직접 코드를 작성해야 합니다.
 
-You can tell the difference between a right-handed coordinate system and a left-handed one by using your hands. Point your thumb to the right. This is the x-axis. Point your pointer finger up. This is the y-axis. Extend your middle finger. This is the z-axis. On your right hand, your middle finger should be pointing towards you. On your left hand, it should be pointing away.
+오른손 좌표계와 왼손 좌표계의 차이는 여러분의 손으로 구별할 수 있습니다. 엄지손가락을 오른쪽으로 향하게 하세요. 이것이 x축입니다. 집게손가락을 위로 향하게 하세요. 이것이 y축입니다. 가운뎃손가락을 펴세요. 이것이 z축입니다. 오른손에서는 가운뎃손가락이 여러분 쪽을 향할 것입니다. 왼손에서는 반대 방향을 향할 것입니다.
 
 ![./left_right_hand.gif](./left_right_hand.gif)
 
-# The Camera Controller
+# 카메라 컨트롤러
 
-Our camera is different, so we'll need a new camera controller. Add the following to `camera.rs`.
+카메라가 달라졌으므로, 새로운 카메라 컨트롤러가 필요합니다. 다음 코드를 `camera.rs`에 추가하세요.
 
 ```rust
 #[derive(Debug)]
@@ -195,14 +195,14 @@ impl CameraController {
         }
     }
 
-    pub fn handle_mouse(&mut self, mouse_dx: f64, mouse_dy: f64) {
+    pub fn process_mouse(&mut self, mouse_dx: f64, mouse_dy: f64) {
         self.rotate_horizontal = mouse_dx as f32;
         self.rotate_vertical = mouse_dy as f32;
     }
 
-    pub fn handle_mouse_scroll(&mut self, delta: &MouseScrollDelta) {
+    pub fn process_scroll(&mut self, delta: &MouseScrollDelta) {
         self.scroll = -match delta {
-            // I'm assuming a line is about 100 pixels
+            // 한 줄(line)은 대략 100픽셀이라고 가정합니다.
             MouseScrollDelta::LineDelta(_, scroll) => scroll * 100.0,
             MouseScrollDelta::PixelDelta(PhysicalPosition {
                 y: scroll,
@@ -214,37 +214,37 @@ impl CameraController {
     pub fn update_camera(&mut self, camera: &mut Camera, dt: Duration) {
         let dt = dt.as_secs_f32();
 
-        // Move forward/backward and left/right
+        // 앞/뒤 및 좌/우 이동
         let (yaw_sin, yaw_cos) = camera.yaw.0.sin_cos();
         let forward = Vector3::new(yaw_cos, 0.0, yaw_sin).normalize();
         let right = Vector3::new(-yaw_sin, 0.0, yaw_cos).normalize();
         camera.position += forward * (self.amount_forward - self.amount_backward) * self.speed * dt;
         camera.position += right * (self.amount_right - self.amount_left) * self.speed * dt;
 
-        // Move in/out (aka. "zoom")
-        // Note: this isn't an actual zoom. The camera's position
-        // changes when zooming. I've added this to make it easier
-        // to get closer to an object you want to focus on.
+        // 안/밖으로 이동 (소위 "줌")
+        // 참고: 이것은 실제 줌이 아닙니다. 줌을 할 때 카메라의 위치가
+        // 변경됩니다. 초점을 맞추고 싶은 객체에 더 쉽게
+        // 다가갈 수 있도록 추가했습니다.
         let (pitch_sin, pitch_cos) = camera.pitch.0.sin_cos();
         let scrollward = Vector3::new(pitch_cos * yaw_cos, pitch_sin, pitch_cos * yaw_sin).normalize();
         camera.position += scrollward * self.scroll * self.speed * self.sensitivity * dt;
         self.scroll = 0.0;
 
-        // Move up/down. Since we don't use roll, we can just
-        // modify the y coordinate directly.
+        // 위/아래 이동. 롤(roll)은 사용하지 않으므로,
+        // y 좌표를 직접 수정할 수 있습니다.
         camera.position.y += (self.amount_up - self.amount_down) * self.speed * dt;
 
-        // Rotate
+        // 회전
         camera.yaw += Rad(self.rotate_horizontal) * self.sensitivity * dt;
         camera.pitch += Rad(-self.rotate_vertical) * self.sensitivity * dt;
 
-        // If process_mouse isn't called every frame, these values
-        // will not get set to zero, and the camera will rotate
-        // when moving in a non-cardinal direction.
+        // `process_mouse`가 매 프레임 호출되지 않으면 이 값들이
+        // 0으로 설정되지 않아, 대각선 방향으로 움직일 때
+        // 카메라가 회전하게 됩니다.
         self.rotate_horizontal = 0.0;
         self.rotate_vertical = 0.0;
 
-        // Keep the camera's angle from going too high/low.
+        // 카메라의 각도가 너무 높아지거나 낮아지지 않도록 제한합니다.
         if camera.pitch < -Rad(SAFE_FRAC_PI_2) {
             camera.pitch = -Rad(SAFE_FRAC_PI_2);
         } else if camera.pitch > Rad(SAFE_FRAC_PI_2) {
@@ -254,9 +254,9 @@ impl CameraController {
 }
 ```
 
-## Cleaning up `lib.rs`
+## `lib.rs` 정리하기
 
-First things first, we need to delete `Camera` and `CameraController`, as well as the extra `OPENGL_TO_WGPU_MATRIX` from `lib.rs`. Once you've done that, import `camera.rs`.
+가장 먼저, `lib.rs`에서 기존의 `Camera`와 `CameraController`, 그리고 불필요해진 `OPENGL_TO_WGPU_MATRIX`를 삭제해야 합니다. 삭제한 후, `camera.rs`를 가져오세요.
 
 ```rust
 mod model;
@@ -264,10 +264,9 @@ mod texture;
 mod camera; // NEW!
 ```
 
-We need to update `update_view_proj` to use our new `Camera` and `Projection`.
+`update_view_proj`가 새로운 `Camera`와 `Projection`을 사용하도록 업데이트해야 합니다.
 
 ```rust
-
 impl CameraUniform {
     // ...
 
@@ -279,7 +278,7 @@ impl CameraUniform {
 }
 ```
 
-We need to change our `State` to use our `Camera`, `CameraProjection` and `Projection` as well. We'll also add a `mouse_pressed` field to store whether the mouse was pressed.
+`State` 구조체도 `Camera`와 `Projection`, `CameraController`를 사용하도록 변경해야 합니다. 또한 마우스 버튼이 눌렸는지 여부를 저장하기 위해 `mouse_pressed` 필드를 추가합니다.
 
 ```rust
 pub struct State {
@@ -293,13 +292,13 @@ pub struct State {
 }
 ```
 
-You'll need to import `winit::dpi::PhysicalPosition` if you haven't already.
+아직 `winit::dpi::PhysicalPosition`을 임포트하지 않았다면 추가해야 합니다.
 
-We need to update `new()` as well.
+`new()` 함수도 업데이트해야 합니다.
 
 ```rust
 impl State {
-    async fn new(window: Arc<Window>) -> anyhow::Result<State> {
+    async fn new(window: Arc<Window>) -> anyhow::Result<Self> {
         // ...
 
         // UPDATED!
@@ -325,7 +324,7 @@ impl State {
 }
 ```
 
-We also need to change our `projection` in `resize`.
+`resize` 함수에서 `projection`도 변경해야 합니다.
 
 ```rust
 fn resize(&mut self, width: u32, height: u32) {
@@ -335,9 +334,9 @@ fn resize(&mut self, width: u32, height: u32) {
 }
 ```
 
-`input()` will need to be updated as well. Up to this point, we have been using `WindowEvent`s for our camera controls. While this works, it's not the best solution. The [winit docs](https://docs.rs/winit/0.24.0/winit/event/enum.WindowEvent.html?search=#variant.CursorMoved) inform us that OS will often transform the data for the `CursorMoved` event to allow effects such as cursor acceleration.
+`input()` 함수도 업데이트해야 합니다. 지금까지는 카메라 제어에 `WindowEvent`를 사용했습니다. 이것도 작동은 하지만 최상의 해결책은 아닙니다. [winit 문서](https://docs.rs/winit/0.24.0/winit/event/enum.WindowEvent.html?search=#variant.CursorMoved)에 따르면, OS는 `CursorMoved` 이벤트에 대해 커서 가속과 같은 효과를 적용하기 위해 데이터를 변형하는 경우가 많습니다.
 
-Now, to fix this, we could change the `input()` function to process `DeviceEvent` instead of `WindowEvent`, but keyboard and button presses don't get emitted as `DeviceEvent`s on MacOS and WASM. Instead, we'll just remove the `CursorMoved` check in `input()` and a manual call to `camera_controller.process_mouse()` in the `run()` function.
+이 문제를 해결하기 위해 `input()` 함수가 `WindowEvent` 대신 `DeviceEvent`를 처리하도록 변경할 수 있지만, 키보드 및 버튼 입력은 macOS와 WASM에서 `DeviceEvent`로 발생하지 않습니다. 대신 `input()`에서 `CursorMoved` 확인을 제거하고, `run()` 함수에서 `camera_controller.process_mouse()`를 수동으로 호출하도록 하겠습니다.
 
 ```rust
 // UPDATED!
@@ -369,7 +368,7 @@ fn input(&mut self, event: &WindowEvent) -> bool {
 }
 ```
 
-Here are the changes to `run()`:
+`run()` 함수의 변경 사항은 다음과 같습니다.
 
 ```rust
 fn main() {
@@ -380,7 +379,7 @@ fn main() {
             // NEW!
             Event::DeviceEvent {
                 event: DeviceEvent::MouseMotion{ delta, },
-                .. // We're not using device_id currently
+                .. // 현재 device_id는 사용하지 않습니다.
             } => if state.mouse_pressed {
                 state.camera_controller.process_mouse(delta.0, delta.1)
             }
@@ -404,7 +403,7 @@ fn main() {
                     WindowEvent::Resized(physical_size) => {
                         state.resize(*physical_size);
                     }
-                    WindowEvent::ScaleFactorChanged { new_inner_is_surface_configured: false, .. } => {
+                    WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
                         state.resize(**new_inner_size);
                     }
                     _ => {}
@@ -416,7 +415,7 @@ fn main() {
 }
 ```
 
-The `update` function requires a bit more explanation. The `update_camera` function on the `CameraController` has a parameter `dt: Duration`, which is the delta time or time between frames. This is to help smooth out the camera movement so that it's not locked by the framerate. Currently, we aren't calculating `dt`, so I decided to pass it into `update` as a parameter.
+`update` 함수는 약간의 추가 설명이 필요합니다. `CameraController`의 `update_camera` 함수에는 `dt: Duration` 매개변수가 있는데, 이는 델타 타임(delta time) 또는 프레임 간의 시간을 의미합니다. 이는 프레임레이트에 종속되지 않고 카메라 움직임을 부드럽게 만들기 위함입니다. 현재 `dt`를 계산하고 있지 않으므로, `update` 함수에 매개변수로 전달하도록 하겠습니다.
 
 ```rust
 fn update(&mut self, dt: instant::Duration) {
@@ -428,7 +427,7 @@ fn update(&mut self, dt: instant::Duration) {
 }
 ```
 
-While we're at it, let's also use `dt` for the light's rotation.
+이왕 하는 김에, 빛의 회전에도 `dt`를 사용합시다.
 
 ```rust
 self.light_uniform.position =
@@ -436,7 +435,7 @@ self.light_uniform.position =
     * old_position).into(); // UPDATED!
 ```
 
-We still need to calculate `dt`. Let's do that in the `main` function.
+아직 `dt`를 계산해야 합니다. `main` 함수에서 계산하도록 합시다.
 
 ```rust
 fn main() {
@@ -460,11 +459,11 @@ fn main() {
 }
 ```
 
-With that, we should be able to move our camera wherever we want.
+이제 우리는 원하는 곳 어디로든 카메라를 움직일 수 있게 되었습니다.
 
 ![./screenshot.png](./screenshot.png)
 
-## Demo
+## 데모
 
 <WasmExample example="tutorial12_camera"></WasmExample>
 

@@ -1,16 +1,16 @@
-# Buffers and Indices
+# 버퍼와 인덱스
 
-## We're finally talking about them!
+## 드디어 그것들에 대해 이야기할 시간입니다!
 
-You were probably getting sick of me saying stuff like, "We'll get to that when we talk about buffers". Well, now's the time to finally talk about buffers, but first...
+제가 "버퍼에 대해 이야기할 때 다루겠습니다" 같은 말을 반복하는 것에 아마 질리셨을 겁니다. 자, 이제 드디어 버퍼에 대해 이야기할 시간이지만, 그 전에 먼저...
 
-## What is a buffer?
+## 버퍼란 무엇일까요?
 
-A buffer is a blob of data on the GPU. A buffer is guaranteed to be contiguous, meaning that all the data is stored sequentially in memory. Buffers are generally used to store simple things like structs or arrays, but they can store more complex stuff such as graph structures like trees (provided all the nodes are stored together and don't reference anything outside the buffer). We are going to use buffers a lot, so let's get started with two of the most important ones: the vertex buffer and the index buffer.
+버퍼는 GPU에 있는 데이터 덩어리(blob)입니다. 버퍼는 모든 데이터가 메모리 상에 순차적으로 저장되는 **연속성(contiguous)**이 보장됩니다. 버퍼는 일반적으로 구조체나 배열과 같은 간단한 것들을 저장하는 데 사용되지만, 트리와 같은 그래프 구조와 같은 더 복잡한 것들도 저장할 수 있습니다(단, 모든 노드가 함께 저장되고 버퍼 외부의 어떤 것도 참조하지 않는 경우에 한합니다). 우리는 버퍼를 많이 사용할 것이므로, 가장 중요한 두 가지인 정점 버퍼와 인덱스 버퍼부터 시작해 봅시다.
 
-## The vertex buffer
+## 정점 버퍼
 
-Previously, we've stored vertex data directly in the vertex shader. While that worked fine to get our bootstraps on, it simply won't do for the long term. The types of objects we need to draw will vary in is_surface_configured: false, and recompiling the shader whenever we need to update the model would massively slow down our program. Instead, we are going to use buffers to store the vertex data we want to draw. Before we do that, though, we need to describe what a vertex looks like. We'll do this by creating a new struct.
+이전에는 정점 데이터를 정점 셰이더에 직접 저장했습니다. 이 방법은 처음 시작하기에는 괜찮았지만, 장기적으로는 적합하지 않습니다. 우리가 그려야 할 객체의 종류는 `is_surface_configured: false`에서 다양하게 변할 수 있으며, 모델을 업데이트할 때마다 셰이더를 다시 컴파일하는 것은 프로그램 속도를 엄청나게 저하시킬 것입니다. 대신, 우리는 버퍼를 사용하여 그리고자 하는 정점 데이터를 저장할 것입니다. 하지만 그 전에, 정점이 어떻게 생겼는지 설명해야 합니다. 이를 위해 새로운 구조체를 만들겠습니다.
 
 ```rust
 // lib.rs
@@ -22,9 +22,9 @@ struct Vertex {
 }
 ```
 
-Our vertices will all have a position and a color. The position represents the x, y, and z of the vertex in 3d space. The color is the red, green, and blue values for the vertex. We need the `Vertex` to be `Copy` so we can create a buffer with it.
+우리의 모든 정점은 위치(position)와 색상(color)을 가집니다. 위치는 3D 공간에서의 정점의 x, y, z 좌표를 나타냅니다. 색상은 정점의 빨강, 초록, 파랑 값을 나타냅니다. `Vertex`가 `Copy` 트레이트를 구현해야 이로부터 버퍼를 만들 수 있습니다.
 
-Next, we need the actual data that will make up our triangle. Below `Vertex`, add the following.
+다음으로, 삼각형을 구성할 실제 데이터가 필요합니다. `Vertex` 구조체 아래에 다음을 추가하세요.
 
 ```rust
 // lib.rs
@@ -35,9 +35,9 @@ const VERTICES: &[Vertex] = &[
 ];
 ```
 
-We arrange the vertices in counter-clockwise order: top, bottom left, bottom right. We do it this way partially out of tradition, but mostly because we specified in the `primitive` of the `render_pipeline` that we want the `front_face` of our triangle to be `wgpu::FrontFace::Ccw` so that we cull the back face. This means that any triangle that should be facing us should have its vertices in counter-clockwise order.
+정점을 반시계 방향(위, 왼쪽 아래, 오른쪽 아래)으로 배열합니다. 이렇게 하는 이유는 부분적으로는 전통 때문이기도 하지만, 주로 `render_pipeline`의 `primitive`에서 삼각형의 `front_face`(앞면)를 `wgpu::FrontFace::Ccw`로 지정하여 뒷면을 컬링(cull)하도록 했기 때문입니다. 이는 우리를 향해야 하는 모든 삼각형의 정점이 반시계 방향으로 배열되어야 함을 의미합니다.
 
-Now that we have our vertex data, we need to store it in a buffer. Let's add a `vertex_buffer` field to `State`.
+이제 정점 데이터가 준비되었으니, 이를 버퍼에 저장해야 합니다. `State`에 `vertex_buffer` 필드를 추가합시다.
 
 ```rust
 // lib.rs
@@ -45,14 +45,14 @@ pub struct State {
     // ...
     render_pipeline: wgpu::RenderPipeline,
 
-    // NEW!
+    // 새로운 코드!
     vertex_buffer: wgpu::Buffer,
 
     // ...
 }
 ```
 
-Now let's create the buffer in `new()`.
+이제 `new()`에서 버퍼를 생성해 봅시다.
 
 ```rust
 // new()
@@ -65,21 +65,21 @@ let vertex_buffer = device.create_buffer_init(
 );
 ```
 
-To access the `create_buffer_init` method on `wgpu::Device`, we'll have to import the [DeviceExt](https://docs.rs/wgpu/latest/wgpu/util/trait.DeviceExt.html#tymethod.create_buffer_init) extension trait. For more information on extension traits, check out [this article](http://xion.io/post/code/rust-extension-traits.html).
+`wgpu::Device`에서 `create_buffer_init` 메서드에 접근하려면, [DeviceExt](https://docs.rs/wgpu/latest/wgpu/util/trait.DeviceExt.html#tymethod.create_buffer_init) 확장 트레이트(extension trait)를 가져와야 합니다. 확장 트레이트에 대한 더 자세한 정보는 [이 글](http://xion.io/post/code/rust-extension-traits.html)을 확인하세요.
 
-To import the extension trait, put this line somewhere near the top of `lib.rs`.
+확장 트레이트를 가져오려면 `lib.rs` 상단 어딘가에 이 줄을 추가하세요.
 
 ```rust
 use wgpu::util::DeviceExt;
 ```
 
-You'll note that we're using [bytemuck](https://docs.rs/bytemuck/latest/bytemuck/) to cast our `VERTICES` as a `&[u8]`. The `create_buffer_init()` method expects a `&[u8]`, and `bytemuck::cast_slice` does that for us. Add the following to your `Cargo.toml`.
+`VERTICES`를 `&[u8]`로 캐스팅하기 위해 [bytemuck](https://docs.rs/bytemuck/latest/bytemuck/)을 사용하고 있음을 알 수 있습니다. `create_buffer_init()` 메서드는 `&[u8]`를 받으며, `bytemuck::cast_slice`가 이 작업을 해줍니다. `Cargo.toml`에 다음을 추가하세요.
 
 ```toml
 bytemuck = { version = "1.16", features = [ "derive" ] }
 ```
 
-We're also going to need to implement two traits to get `bytemuck` to work. These are [bytemuck::Pod](https://docs.rs/bytemuck/latest/bytemuck/trait.Pod.html) and [bytemuck::Zeroable](https://docs.rs/bytemuck/latest/bytemuck/trait.Zeroable.html). `Pod` indicates that our `Vertex` is "Plain Old Data", and thus can be interpreted as a `&[u8]`. `Zeroable` indicates that we can use `std::mem::zeroed()`. We can modify our `Vertex` struct to derive these methods.
+또한 `bytemuck`이 작동하게 하려면 두 개의 트레이트를 구현해야 합니다. 이들은 [bytemuck::Pod](https://docs.rs/bytemuck/latest/bytemuck/trait.Pod.html)와 [bytemuck::Zeroable](https://docs.rs/bytemuck/latest/bytemuck/trait.Zeroable.html)입니다. `Pod`는 우리 `Vertex`가 "Plain Old Data"임을 나타내며, 따라서 `&[u8]`로 해석될 수 있음을 의미합니다. `Zeroable`은 `std::mem::zeroed()`를 사용할 수 있음을 나타냅니다. `Vertex` 구조체를 수정하여 이 메서드들을 derive 할 수 있습니다.
 
 ```rust
 #[repr(C)]
@@ -92,7 +92,7 @@ struct Vertex {
 
 <div class="note">
 
-If your struct includes types that don't implement `Pod` and `Zeroable`, you'll need to implement these traits manually. These traits don't require us to implement any methods, so we just need to use the following to get our code to work.
+만약 구조체에 `Pod`와 `Zeroable`을 구현하지 않는 타입이 포함되어 있다면, 이 트레이트들을 수동으로 구현해야 합니다. 이 트레이트들은 우리가 어떤 메서드도 구현할 것을 요구하지 않으므로, 코드가 작동하게 하려면 다음을 사용하면 됩니다.
 
 ```rust
 unsafe impl bytemuck::Pod for Vertex {}
@@ -101,7 +101,7 @@ unsafe impl bytemuck::Zeroable for Vertex {}
 
 </div>
 
-Finally, we can add our `vertex_buffer` to our `State` struct.
+마지막으로, `vertex_buffer`를 `State` 구조체에 추가할 수 있습니다.
 
 ```rust
 Ok(Self {
@@ -116,11 +116,11 @@ Ok(Self {
 })
 ```
 
-## So, what do I do with it?
+## 그래서, 이걸로 뭘 해야 할까요?
 
-We need to tell the `render_pipeline` to use this buffer when we are drawing, but first, we need to tell the `render_pipeline` how to read the buffer. We do this using `VertexBufferLayout`s and the `vertex_buffers` field that I promised we'd talk about when we created the `render_pipeline`.
+그리기 작업을 할 때 `render_pipeline`에게 이 버퍼를 사용하라고 알려줘야 하지만, 그 전에 `render_pipeline`에게 버퍼를 어떻게 읽어야 하는지 알려줘야 합니다. 이 작업은 `VertexBufferLayout`과 `render_pipeline`을 만들 때 이야기하겠다고 약속했던 `vertex_buffers` 필드를 사용하여 수행합니다.
 
-A `VertexBufferLayout` defines how a buffer is represented in memory. Without this, the render_pipeline has no idea how to map the buffer in the shader. Here's what the descriptor for a buffer full of `Vertex` would look like.
+`VertexBufferLayout`은 버퍼가 메모리에서 어떻게 표현되는지를 정의합니다. 이것이 없으면 `render_pipeline`은 셰이더에서 버퍼를 어떻게 매핑해야 할지 알 수 없습니다. `Vertex`로 가득 찬 버퍼에 대한 디스크립터(descriptor)는 다음과 같습니다.
 
 ```rust
 wgpu::VertexBufferLayout {
@@ -141,18 +141,18 @@ wgpu::VertexBufferLayout {
 }
 ```
 
-1. The `array_stride` defines how wide a vertex is. When the shader goes to read the next vertex, it will skip over the `array_stride` number of bytes. In our case, array_stride will probably be 24 bytes.
-2. `step_mode` tells the pipeline whether each element of the array in this buffer represents per-vertex data or per-instance data. We can specify `wgpu::VertexStepMode::Instance` if we only want to change vertices when we start drawing a new instance. We'll cover instancing in a later tutorial.
-3. Vertex attributes describe the individual parts of the vertex. Generally, this is a 1:1 mapping with a struct's fields, which is true in our case.
-4. This defines the `offset` in bytes until the attribute starts. For the first attribute, the offset is usually zero. For any later attributes, the offset is the sum over `size_of` of the previous attributes' data.
-5. This tells the shader what location to store this attribute at. For example, `@location(0) x: vec3<f32>` in the vertex shader would correspond to the `position` field of the `Vertex` struct, while `@location(1) x: vec3<f32>` would be the `color` field.
-6. `format` tells the shader the shape of the attribute. `Float32x3` corresponds to `vec3<f32>` in shader code. The max value we can store in an attribute is `Float32x4` (`Uint32x4`, and `Sint32x4` work as well). We'll keep this in mind for when we have to store things that are bigger than `Float32x4`.
+1.  `array_stride`는 정점 하나의 크기가 얼마인지를 정의합니다. 셰이더가 다음 정점을 읽으러 갈 때, `array_stride`만큼의 바이트를 건너뛸 것입니다. 우리 경우, `array_stride`는 아마 24바이트일 것입니다.
+2.  `step_mode`는 이 버퍼에 있는 배열의 각 요소가 정점별(per-vertex) 데이터를 나타내는지, 인스턴스별(per-instance) 데이터를 나타내는지를 파이프라인에 알려줍니다. 만약 새로운 인스턴스를 그리기 시작할 때만 정점을 바꾸고 싶다면 `wgpu::VertexStepMode::Instance`를 지정할 수 있습니다. 인스턴싱은 나중 튜토리얼에서 다룰 것입니다.
+3.  `attributes`(속성)는 정점의 개별 부분을 설명합니다. 일반적으로 이는 구조체의 필드와 1:1로 매핑되며, 우리 경우도 마찬가지입니다.
+4.  `offset`은 속성이 시작되기까지의 바이트 단위 오프셋을 정의합니다. 첫 번째 속성의 경우, 오프셋은 보통 0입니다. 이후 속성들의 오프셋은 이전 속성들의 데이터 크기(`size_of`)의 총합입니다.
+5.  `shader_location`은 이 속성을 어느 위치에 저장할지를 셰이더에 알려줍니다. 예를 들어, 정점 셰이더의 `@location(0) x: vec3<f32>`는 `Vertex` 구조체의 `position` 필드에 해당하고, `@location(1) x: vec3<f32>`는 `color` 필드에 해당합니다.
+6.  `format`은 속성의 형태를 셰이더에 알려줍니다. `Float32x3`은 셰이더 코드의 `vec3<f32>`에 해당합니다. 속성에 저장할 수 있는 최대값은 `Float32x4`입니다(`Uint32x4`, `Sint32x4`도 가능). `Float32x4`보다 큰 것을 저장해야 할 때 이를 염두에 둘 것입니다.
 
-For you visual learners, our vertex buffer looks like this.
+시각적인 학습자를 위해, 우리의 정점 버퍼는 다음과 같이 보입니다.
 
-![A figure of the VertexBufferLayout](./vb_desc.png)
+![VertexBufferLayout 그림](./vb_desc.png)
 
-Let's create a static method on `Vertex` that returns this descriptor.
+`Vertex`에 이 디스크립터를 반환하는 정적 메서드를 만들어 봅시다.
 
 ```rust
 // lib.rs
@@ -180,7 +180,7 @@ impl Vertex {
 
 <div class="note">
 
-Specifying the attributes as we did now is quite verbose. We could use the `vertex_attr_array` macro provided by wgpu to clean things up a bit. With it, our `VertexBufferLayout` becomes
+지금처럼 속성을 지정하는 것은 꽤 장황합니다. wgpu에서 제공하는 `vertex_attr_array` 매크로를 사용하면 코드를 좀 더 깔끔하게 만들 수 있습니다. 이를 사용하면 `VertexBufferLayout`은 다음과 같이 됩니다.
 
 ```rust
 wgpu::VertexBufferLayout {
@@ -190,7 +190,7 @@ wgpu::VertexBufferLayout {
 }
 ```
 
-While this is definitely nice, Rust sees the result of `vertex_attr_array` as a temporary value, so a tweak is required to return it from a function. We could [make it `const`](https://github.com/gfx-rs/wgpu/discussions/1790#discussioncomment-1160378), as in the example below:
+이것이 확실히 좋긴 하지만, Rust는 `vertex_attr_array`의 결과를 임시 값으로 보기 때문에 함수에서 반환하려면 약간의 수정이 필요합니다. 아래 예제처럼 [`const`로 만들 수 있습니다](https://github.com/gfx-rs/wgpu/discussions/1790#discussioncomment-1160378).
 
 ```rust
 impl Vertex {
@@ -209,11 +209,11 @@ impl Vertex {
 }
 ```
 
-Regardless, I feel it's good to show how the data gets mapped, so I'll forgo using this macro for now.
+어쨌든, 데이터가 어떻게 매핑되는지 보여주는 것이 좋다고 생각하므로, 지금은 이 매크로를 사용하지 않겠습니다.
 
 </div>
 
-Now, we can use it when we create the `render_pipeline`.
+이제, `render_pipeline`을 만들 때 이것을 사용할 수 있습니다.
 
 ```rust
 let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -228,21 +228,21 @@ let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescrip
 });
 ```
 
-One more thing: we need to actually set the vertex buffer in the render method. Otherwise, our program will crash.
+한 가지 더: 렌더 메서드에서 실제로 정점 버퍼를 설정해야 합니다. 그렇지 않으면 프로그램이 충돌할 것입니다.
 
 ```rust
 // render()
 render_pass.set_pipeline(&self.render_pipeline);
-// NEW!
+// 새로운 코드!
 render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
 render_pass.draw(0..3, 0..1);
 ```
 
-`set_vertex_buffer` takes two parameters. The first is what buffer slot to use for this vertex buffer. You can have multiple vertex buffers set at a time.
+`set_vertex_buffer`는 두 개의 매개변수를 받습니다. 첫 번째는 이 정점 버퍼에 사용할 버퍼 슬롯입니다. 한 번에 여러 개의 정점 버퍼를 설정할 수 있습니다.
 
-The second parameter is the slice of the buffer to use. You can store as many objects in a buffer as your hardware allows, so `slice` allows us to specify which portion of the buffer to use. We use `..` to specify the entire buffer.
+두 번째 매개변수는 사용할 버퍼의 슬라이스입니다. 하드웨어가 허용하는 한 버퍼에 많은 객체를 저장할 수 있으므로, `slice`를 사용하면 사용할 버퍼의 부분을 지정할 수 있습니다. `..`를 사용하여 전체 버퍼를 지정합니다.
 
-Before we continue, we should change the `render_pass.draw()` call to use the number of vertices specified by `VERTICES`. Add a `num_vertices` to `State`, and set it to be equal to `VERTICES.len()`.
+계속하기 전에, `render_pass.draw()` 호출이 `VERTICES`에 지정된 정점 수를 사용하도록 변경해야 합니다. `State`에 `num_vertices`를 추가하고, `VERTICES.len()`과 같게 설정하세요.
 
 ```rust
 // lib.rs
@@ -273,14 +273,14 @@ impl State {
 }
 ```
 
-Then, use it in the draw call.
+그런 다음, draw 호출에서 사용하세요.
 
 ```rust
 // render
 render_pass.draw(0..self.num_vertices, 0..1);
 ```
 
-Before our changes will have any effect, we need to update our vertex shader to get its data from the vertex buffer. We'll also have it include the vertex color as well.
+우리의 변경 사항이 효과를 발휘하려면, 정점 셰이더가 정점 버퍼에서 데이터를 가져오도록 업데이트해야 합니다. 또한 정점 색상도 포함하도록 할 것입니다.
 
 ```wgsl
 // Vertex shader
@@ -313,16 +313,16 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 }
 ```
 
-If you've done things correctly, you should see a triangle that looks something like this.
+모든 것을 올바르게 했다면, 다음과 같이 생긴 삼각형이 보일 것입니다.
 
-![A colorful triangle](./triangle.png)
+![알록달록한 삼각형](./triangle.png)
 
-## The index buffer
-We technically don't *need* an index buffer, but they still are plenty useful. An index buffer comes into play when we start using models with a lot of triangles. Consider this pentagon.
+## 인덱스 버퍼
+기술적으로 인덱스 버퍼가 *필수*는 아니지만, 여전히 매우 유용합니다. 인덱스 버퍼는 많은 삼각형으로 이루어진 모델을 사용하기 시작할 때 중요해집니다. 이 오각형을 생각해 보세요.
 
-![A pentagon made of 3 triangles](./pentagon.png)
+![3개의 삼각형으로 만들어진 오각형](./pentagon.png)
 
-It has a total of 5 vertices and 3 triangles. Now, if we wanted to display something like this using just vertices, we would need something like the following.
+총 5개의 정점과 3개의 삼각형으로 이루어져 있습니다. 이제, 만약 이런 것을 정점만 사용해서 표시하고 싶다면, 다음과 같은 것이 필요할 것입니다.
 
 ```rust
 const VERTICES: &[Vertex] = &[
@@ -340,9 +340,9 @@ const VERTICES: &[Vertex] = &[
 ];
 ```
 
-You'll note, though, that some of the vertices are used more than once. C and B are used twice, and E is repeated three times. Assuming that each float is 4 bytes, then that means of the 216 bytes we use for `VERTICES`, 96 of them are duplicate data. Wouldn't it be nice if we could list these vertices once? Well, we can! That's where an index buffer comes into play.
+하지만 일부 정점은 두 번 이상 사용되는 것을 알 수 있습니다. C와 B는 두 번 사용되고, E는 세 번 반복됩니다. 각 float가 4바이트라고 가정하면, `VERTICES`에 사용하는 216바이트 중 96바이트가 중복 데이터라는 의미입니다. 이 정점들을 한 번만 나열할 수 있다면 좋지 않을까요? 네, 할 수 있습니다! 바로 여기서 인덱스 버퍼가 사용됩니다.
 
-Basically, we store all the unique vertices in `VERTICES`, and we create another buffer that stores indices to elements in `VERTICES` to create the triangles. Here's an example of that with our pentagon.
+기본적으로, 모든 고유한 정점을 `VERTICES`에 저장하고, `VERTICES`의 요소에 대한 인덱스를 저장하는 다른 버퍼를 만들어 삼각형을 생성합니다. 오각형을 예로 들면 다음과 같습니다.
 
 ```rust
 // lib.rs
@@ -361,9 +361,9 @@ const INDICES: &[u16] = &[
 ];
 ```
 
-Now, with this setup, our `VERTICES` take up about 120 bytes and `INDICES` is just 18 bytes, given that `u16` is 2 bytes wide. In this case, wgpu automatically adds 2 extra bytes of padding to make sure the buffer is aligned to 4 bytes, but it's still just 20 bytes. Altogether, our pentagon is 140 bytes in total. That means we saved 76 bytes! It may not seem like much, but when dealing with tri counts in the hundreds of thousands, indexing saves a lot of memory. Please note, that the order of the indices matters. In the example above, the triangles are created counterclockwise. If you want to change it to clockwise, go to your render pipeline and change the `front_face` to `Cw`.  
+이제 이 설정으로, `VERTICES`는 약 120바이트를 차지하고 `INDICES`는 `u16`이 2바이트이므로 단 18바이트입니다. 이 경우, wgpu는 버퍼가 4바이트에 정렬되도록 자동으로 2바이트의 패딩을 추가하지만, 그래도 여전히 20바이트에 불과합니다. 모두 합쳐서 우리 오각형은 총 140바이트입니다. 이는 76바이트를 절약했다는 의미입니다! 많아 보이지 않을 수 있지만, 수십만 개의 삼각형을 다룰 때 인덱싱은 많은 메모리를 절약해 줍니다. 인덱스의 순서가 중요하다는 점에 유의하세요. 위 예제에서 삼각형은 반시계 방향으로 생성됩니다. 만약 시계 방향으로 바꾸고 싶다면, 렌더 파이프라인으로 가서 `front_face`를 `Cw`로 변경하세요.
 
-There are a couple of things we need to change in order to use indexing. The first is we need to create a buffer to store the indices. In `State`'s `new()` method, create the `index_buffer` after you create the `vertex_buffer`. Also, change `num_vertices` to `num_indices` and set it equal to `INDICES.len()`.
+인덱싱을 사용하기 위해 변경해야 할 몇 가지 사항이 있습니다. 첫 번째는 인덱스를 저장할 버퍼를 만드는 것입니다. `State`의 `new()` 메서드에서 `vertex_buffer`를 만든 후에 `index_buffer`를 만드세요. 또한 `num_vertices`를 `num_indices`로 변경하고 `INDICES.len()`과 같게 설정하세요.
 
 ```rust
 let vertex_buffer = device.create_buffer_init(
@@ -373,7 +373,7 @@ let vertex_buffer = device.create_buffer_init(
         usage: wgpu::BufferUsages::VERTEX,
     }
 );
-// NEW!
+// 새로운 코드!
 let index_buffer = device.create_buffer_init(
     &wgpu::util::BufferInitDescriptor {
         label: Some("Index Buffer"),
@@ -384,7 +384,7 @@ let index_buffer = device.create_buffer_init(
 let num_indices = INDICES.len() as u32;
 ```
 
-We don't need to implement `Pod` and `Zeroable` for our indices because `bytemuck` has already implemented them for basic types such as `u16`. That means we can just add `index_buffer` and `num_indices` to the `State` struct.
+인덱스에 대해서는 `Pod`와 `Zeroable`을 구현할 필요가 없습니다. 왜냐하면 `bytemuck`이 `u16`과 같은 기본 타입에 대해 이미 구현해 놓았기 때문입니다. 즉, `State` 구조체에 `index_buffer`와 `num_indices`를 추가하기만 하면 됩니다.
 
 ```rust
 pub struct State {
@@ -396,13 +396,13 @@ pub struct State {
     window: Arc<Window>,
     render_pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
-    // NEW!
+    // 새로운 코드!
     index_buffer: wgpu::Buffer, 
     num_indices: u32,
 }
 ```
 
-And then populate these fields in the constructor:
+그런 다음 생성자에서 이 필드들을 채워줍니다:
 
 ```rust
 Ok(Self {
@@ -414,13 +414,13 @@ Ok(Self {
     window,
     render_pipeline,
     vertex_buffer,
-    // NEW!
+    // 새로운 코드!
     index_buffer,
     num_indices,
 })
 ```
 
-All we have to do now is update the `render()` method to use the `index_buffer`.
+이제 남은 일은 `render()` 메서드를 업데이트하여 `index_buffer`를 사용하는 것뿐입니다.
 
 ```rust
 // render()
@@ -430,30 +430,30 @@ render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uin
 render_pass.draw_indexed(0..self.num_indices, 0, 0..1); // 2.
 ```
 
-A couple of things to note:
+몇 가지 주의할 점:
 
-1. The method name is `set_index_buffer`, not `set_index_buffers`. You can only have one index buffer set at a time.
-2. When using an index buffer, you need to use `draw_indexed`. The `draw` method ignores the index buffer. Also, make sure you use the number of indices (`num_indices`), not vertices, as your model will either draw wrong or the method will `panic` because there are not enough indices.
+1.  메서드 이름은 `set_index_buffer`이지, `set_index_buffers`가 아닙니다. 한 번에 하나의 인덱스 버퍼만 설정할 수 있습니다.
+2.  인덱스 버퍼를 사용할 때는 `draw_indexed`를 사용해야 합니다. `draw` 메서드는 인덱스 버퍼를 무시합니다. 또한, 모델이 잘못 그려지거나 인덱스가 부족하여 메서드가 `panic`을 일으키지 않도록 정점 수(`num_vertices`)가 아닌 인덱스 수(`num_indices`)를 사용해야 합니다.
 
-With all that you should have a garishly magenta pentagon in your window.
+이 모든 것을 마치면 창에 화려한 자홍색 오각형이 나타날 것입니다.
 
-![Magenta pentagon in window](./indexed-pentagon.png)
+![창 안의 자홍색 오각형](./indexed-pentagon.png)
 
-## Color Correction
+## 색상 보정
 
-If you use a color picker on the magenta pentagon, you'll get a hex value of #BC00BC. If you convert this to RGB values, you'll get (188, 0, 188). Dividing these values by 255 to get them into the [0, 1] range, we get roughly (0.737254902, 0, 0.737254902). This is not the same as what we are using for our vertex colors, which is (0.5, 0.0, 0.5). The reason for this has to do with color spaces.
+자홍색 오각형에 색상 선택기(color picker)를 사용하면 #BC00BC라는 16진수 값을 얻게 됩니다. 이를 RGB 값으로 변환하면 (188, 0, 188)이 됩니다. 이 값들을 255로 나누어 [0, 1] 범위로 만들면 대략 (0.737254902, 0, 0.737254902)가 됩니다. 이는 우리가 정점 색상으로 사용하고 있는 (0.5, 0.0, 0.5)와 다릅니다. 그 이유는 색 공간(color space)과 관련이 있습니다.
 
-Most monitors use a color space known as sRGB. Our surface is (most likely depending on what is returned from `surface.get_preferred_format()`) using an sRGB texture format. The sRGB format stores colors according to their relative brightness instead of their actual brightness. The reason for this is that our eyes don't perceive light linearly. We notice more differences in darker colors than in lighter colors.
+대부분의 모니터는 sRGB라는 색 공간을 사용합니다. 우리 서피스는 (아마도 `surface.get_preferred_format()`이 반환하는 값에 따라) sRGB 텍스처 형식을 사용하고 있습니다. sRGB 형식은 색상을 실제 밝기가 아닌 상대적인 밝기에 따라 저장합니다. 그 이유는 우리 눈이 빛을 선형적으로 인식하지 않기 때문입니다. 우리는 밝은 색보다 어두운 색에서 더 많은 차이를 알아챕니다.
 
-Most software that uses colors stores them in sRGB format (or a similar proprietary one). Wgpu expects values in linear color space, so we have to convert the values.
+색상을 사용하는 대부분의 소프트웨어는 sRGB 형식(또는 유사한 독점 형식)으로 색상을 저장합니다. wgpu는 선형 색 공간(linear color space)의 값을 기대하므로 값을 변환해야 합니다.
 
-You get the correct color using the following formula: `rgb_color = ((srgb_color / 255 + 0.055) / 1.055) ^ 2.4`. Doing this with an sRGB value of (188, 0, 188) will give us (0.5028864580325687, 0.0, 0.5028864580325687). A little off from our (0.5, 0.0, 0.5). Instead of doing a manual color conversion, you'll likely save a lot of time by using textures instead, as if they are store in an sRGB texture, the conversion to linear will happen automatically. We'll cover textures in the next lesson.
+다음 공식을 사용하여 올바른 색상을 얻을 수 있습니다: `rgb_color = ((srgb_color / 255 + 0.055) / 1.055) ^ 2.4`. sRGB 값 (188, 0, 188)에 이 공식을 적용하면 (0.5028864580325687, 0.0, 0.5028864580325687)이 나옵니다. 우리의 (0.5, 0.0, 0.5)와는 약간 다릅니다. 수동으로 색상 변환을 하는 대신, 텍스처를 사용하면 시간을 많이 절약할 수 있습니다. 텍스처가 sRGB 텍스처에 저장되어 있다면 선형으로의 변환이 자동으로 일어나기 때문입니다. 텍스처는 다음 강의에서 다룰 것입니다.
 
-## Demo
+## 데모
 
 <WasmExample example="tutorial4_buffer"></WasmExample>
 
 <AutoGithubLink/>
 
-## Challenge
-Create a more complex shape than the one we made (aka. more than three triangles) using a vertex buffer and an index buffer. Toggle between the two with the space key.
+## 도전 과제
+우리가 만든 것보다 더 복잡한 모양(즉, 세 개 이상의 삼각형)을 정점 버퍼와 인덱스 버퍼를 사용하여 만들어 보세요. 스페이스 키를 눌러 두 가지를 번갈아 가며 표시해 보세요.

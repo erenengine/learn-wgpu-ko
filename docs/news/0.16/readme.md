@@ -1,6 +1,6 @@
-# Update to 0.16
+# 0.16 업데이트
 
-Very few changes here! We no longer need to use `NonZeroU32` and the like, instead it will be an `Option<u32>`. This is mostly used in dealing with textures.
+이번 업데이트는 변경점이 거의 없습니다! 이제 더 이상 `NonZeroU32`와 같은 타입을 사용할 필요 없이, 대신 `Option<u32>`를 사용하게 됩니다. 이 변경점은 주로 텍스처를 다룰 때 적용됩니다.
 
 ```rust
 queue.write_texture(
@@ -22,7 +22,7 @@ queue.write_texture(
 );
 ```
 
-In other news WebGPU has been added to Chrome 113 and up! Currently the Linux version of Chrome beta isn't working and while it's working in Firefox, I'm going to hold off on switching to using that instead of the WebGL compatibility mode. If you mess around with WebGPU in browser check <https://caniuse.com/webgpu> to see if your browser is supported and then remove the extra `wgpu` line from the `[target.'cfg(target_arch = "wasm32")'.dependencies]` section of `Cargo.toml`:
+다른 소식으로는, WebGPU가 크롬 113 및 상위 버전에 추가되었습니다! 현재 리눅스용 크롬 베타 버전에서는 작동하지 않으며, 파이어폭스에서는 작동하긴 하지만, 저는 WebGL 호환성 모드 대신 네이티브 WebGPU를 사용하도록 전환하는 것을 잠시 보류할 생각입니다. 만약 브라우저에서 WebGPU를 사용해보고 싶으시다면, <https://caniuse.com/webgpu>에서 사용하시는 브라우저의 지원 여부를 확인한 후, `Cargo.toml` 파일의 `[target.'cfg(target_arch = "wasm32")'.dependencies]` 섹션에서 아래 `wgpu` 라인을 삭제하세요:
 
 ```toml
 [target.'cfg(target_arch = "wasm32")'.dependencies]
@@ -40,6 +40,6 @@ web-sys = { version = "0.3", features = [
 ]}
 ```
 
-No other changes need to be made to switch to using WebGPU in browser, so once the WebGPU samples at <https://webgpu.github.io/> work in Chrome on Linux, I'll look into removing the `webgl` feature.
+브라우저에서 WebGPU를 사용하도록 전환하기 위해 필요한 다른 변경 사항은 없습니다. 따라서 리눅스용 크롬에서 <https://webgpu.github.io/>의 WebGPU 샘플들이 작동하는 것이 확인되면, `webgl` 기능을 제거하는 것을 검토해 보겠습니다.
 
-That's all! As always let me know if I missed anything!
+이게 전부입니다! 늘 그렇듯이, 제가 놓친 부분이 있다면 알려주세요

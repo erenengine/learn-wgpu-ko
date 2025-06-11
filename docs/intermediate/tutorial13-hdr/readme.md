@@ -1,33 +1,33 @@
-# High Dynamic Range Rendering
+# 하이 다이내믹 레인지 렌더링 (High Dynamic Range Rendering)
 
-Up to this point, we've been using the sRGB colorspace to render our scene. While this is fine, it limits what we can do with our lighting. We are using `TextureFormat::Bgra8UnormSrgb` (on most systems) for our surface texture. This means we have 8 bits for each red, green, blue and alpha channel. While the channels are stored as integers between 0 and 255 inclusively, they get converted to and from floating point values between 0.0 and 1.0. The TL:DR of this is that using 8-bit textures, we only get 256 possible values in each channel.
+지금까지 우리는 sRGB 색상 공간을 사용하여 씬(scene)을 렌더링해 왔습니다. 이것도 괜찮지만, 조명을 다루는 데 한계가 있습니다. 우리는 (대부분의 시스템에서) 서피스 텍스처(surface texture)로 `TextureFormat::Bgra8UnormSrgb`를 사용하고 있습니다. 이는 빨강, 초록, 파랑, 알파 각 채널에 8비트를 사용한다는 의미입니다. 채널들은 0에서 255 사이의 정수로 저장되지만, 0.0과 1.0 사이의 부동 소수점 값으로 변환됩니다. 요약하자면, 8비트 텍스처를 사용하면 각 채널에서 256개의 가능한 값만 얻을 수 있다는 것입니다.
 
-The kicker with this is most of the precision gets used to represent darker values of the scene. This means that bright objects like light bulbs have the same value as exceedingly bright objects like the sun. This inaccuracy makes realistic lighting difficult to do right. Because of this, we are going to switch our rendering system to use high dynamic range in order to give our scene more flexibility and enable us to leverage more advanced techniques such as Physically Based Rendering.
+여기서 핵심은 이 정밀도의 대부분이 씬의 어두운 값을 표현하는 데 사용된다는 점입니다. 이는 전구와 같은 밝은 물체가 태양과 같은 극도로 밝은 물체와 동일한 값을 갖게 된다는 것을 의미합니다. 이러한 부정확성 때문에 사실적인 조명을 올바르게 구현하기가 어렵습니다. 이 때문에, 우리는 씬에 더 많은 유연성을 부여하고 물리 기반 렌더링(Physically Based Rendering)과 같은 고급 기술을 활용할 수 있도록 렌더링 시스템을 하이 다이내믹 레인지(HDR)를 사용하도록 전환할 것입니다.
 
-## What is High Dynamic Range?
+## 하이 다이내믹 레인지란 무엇인가?
 
-In layman's terms, a High Dynamic Range texture is a texture with more bits per pixel. In addition to this, HDR textures are stored as floating point values instead of integer values. This means that the texture can have brightness values greater than 1.0, meaning you can have a dynamic range of brighter objects.
+일반적으로 하이 다이내믹 레인지(HDR) 텍스처는 픽셀당 더 많은 비트를 가진 텍스처입니다. 또한, HDR 텍스처는 정수 값 대신 부동 소수점 값으로 저장됩니다. 이는 텍스처가 1.0보다 큰 밝기 값을 가질 수 있음을 의미하며, 따라서 더 밝은 객체들의 다이내믹 레인지를 가질 수 있습니다.
 
-## Switching to HDR
+## HDR로 전환하기
 
-As of writing, wgpu doesn't allow us to use a floating point format such as `TextureFormat::Rgba16Float` as the surface texture format (not all monitors support that anyway), so we will have to render our scene in an HDR format, then convert the values to a supported format, such as `TextureFormat::Bgra8UnormSrgb` using a technique called tonemapping.
+이 글을 쓰는 시점에서 wgpu는 `TextureFormat::Rgba16Float`와 같은 부동 소수점 포맷을 서피스 텍스처 포맷으로 사용하는 것을 허용하지 않습니다 (모든 모니터가 이를 지원하는 것도 아닙니다). 따라서 우리는 씬을 HDR 포맷으로 렌더링한 다음, 톤 매핑(tonemapping)이라는 기술을 사용하여 그 값들을 `TextureFormat::Bgra8UnormSrgb`와 같은 지원되는 포맷으로 변환해야 합니다.
 
 <div class="note">
 
-There are some talks about implementing HDR surface texture support in wgpu. Here is a GitHub issue if you want to contribute to that effort: https://github.com/gfx-rs/wgpu/issues/2920
+wgpu에서 HDR 서피스 텍스처 지원을 구현하는 것에 대한 몇 가지 논의가 있습니다. 이 노력에 기여하고 싶다면 다음 GitHub 이슈를 참고하세요: https://github.com/gfx-rs/wgpu/issues/2920
 
 </div>
 
-Before we do that, though, we need to switch to using an HDR texture for rendering.
+하지만 그 전에, 렌더링에 HDR 텍스처를 사용하도록 전환해야 합니다.
 
-To start, we'll create a file called `hdr.rs` and put some code in it:
+먼저, `hdr.rs`라는 파일을 만들고 다음 코드를 넣겠습니다:
 
 ```rust
 use wgpu::Operations;
 
 use crate::{create_render_pipeline, texture};
 
-/// Owns the render texture and controls tonemapping
+/// 렌더 텍스처를 소유하고 톤 매핑을 제어합니다.
 pub struct HdrPipeline {
     pipeline: wgpu::RenderPipeline,
     bind_group: wgpu::BindGroup,
@@ -43,8 +43,8 @@ impl HdrPipeline {
         let width = config.width;
         let height = config.height;
 
-        // We could use `Rgba32Float`, but that requires some extra
-        // features to be enabled for rendering.
+        // `Rgba32Float`를 사용할 수도 있지만, 렌더링을 위해
+        // 몇 가지 추가 기능을 활성화해야 합니다.
         let format = wgpu::TextureFormat::Rgba16Float;
 
         let texture = texture::Texture::create_2d_texture(
@@ -60,7 +60,7 @@ impl HdrPipeline {
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Hdr::layout"),
             entries: &[
-                // This is the HDR texture
+                // 이것이 HDR 텍스처입니다.
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStages::FRAGMENT,
@@ -94,7 +94,7 @@ impl HdrPipeline {
             ],
         });
 
-        // We'll cover the shader next
+        // 셰이더는 다음에 다룰 것입니다.
         let shader = wgpu::include_wgsl!("hdr.wgsl");
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
@@ -107,8 +107,8 @@ impl HdrPipeline {
             &pipeline_layout,
             config.format.add_srgb_suffix(),
             None,
-            // We'll use some math to generate the vertex data in
-            // the shader, so we don't need any vertex buffers
+            // 셰이더에서 수학을 사용하여 정점 데이터를 생성할 것이므로,
+            // 정점 버퍼는 필요 없습니다.
             &[],
             wgpu::PrimitiveTopology::TriangleList,
             shader,
@@ -125,7 +125,7 @@ impl HdrPipeline {
         }
     }
 
-    /// Resize the HDR texture
+    /// HDR 텍스처 크기 조정
     pub fn resize(&mut self, device: &wgpu::Device, width: u32, height: u32) {
         self.texture = texture::Texture::create_2d_texture(
             device,
@@ -154,18 +154,18 @@ impl HdrPipeline {
         self.height = height;
     }
 
-    /// Exposes the HDR texture
+    /// HDR 텍스처를 노출합니다.
     pub fn view(&self) -> &wgpu::TextureView {
         &self.texture.view
     }
 
-    /// The format of the HDR texture
+    /// HDR 텍스처의 포맷
     pub fn format(&self) -> wgpu::TextureFormat {
         self.format
     }
 
-    /// This renders the internal HDR texture to the [TextureView]
-    /// supplied as parameter.
+    /// 이 메서드는 내부 HDR 텍스처를 매개변수로 제공된
+    /// [TextureView]에 렌더링합니다.
     pub fn process(&self, encoder: &mut wgpu::CommandEncoder, output: &wgpu::TextureView) {
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Hdr::process"),
@@ -186,7 +186,7 @@ impl HdrPipeline {
 }
 ```
 
-You may have noticed that we added a new parameter to `create_render_pipeline`. Here a the changes to that function:
+`create_render_pipeline`에 새로운 매개변수를 추가한 것을 눈치채셨을 겁니다. 해당 함수의 변경 사항은 다음과 같습니다:
 
 ```rust
 fn create_render_pipeline(
@@ -211,15 +211,15 @@ fn create_render_pipeline(
 }
 ```
 
-## Tonemapping
+## 톤 매핑(Tonemapping)
 
-The process of tonemapping is taking an HDR image and converting it to a Standard Dynamic Range (SDR), which is usually sRGB. The exact tonemapping curve you use is ultimately up to your artistic needs, but for this tutorial, we'll use a popular one known as the Academy Color Encoding System or ACES used throughout the game industry as well as the film industry.
+톤 매핑 과정은 HDR 이미지를 가져와 표준 다이내믹 레인지(SDR)로 변환하는 것이며, 보통 sRGB를 사용합니다. 사용하는 톤 매핑 곡선은 궁극적으로 예술적 필요에 따라 결정되지만, 이 튜토리얼에서는 게임 산업과 영화 산업 전반에 걸쳐 널리 사용되는 아카데미 컬러 인코딩 시스템(Academy Color Encoding System, ACES)이라는 인기 있는 방법을 사용하겠습니다.
 
-With that, let's jump into the the shader. Create a file called `hdr.wgsl` and add the following code:
+이제 셰이더로 넘어가 봅시다. `hdr.wgsl`이라는 파일을 만들고 다음 코드를 추가하세요:
 
 ```wgsl
-// Maps HDR values to linear values
-// Based on http://www.oscars.org/science-technology/sci-tech-projects/aces
+// HDR 값을 선형 값으로 매핑합니다.
+// http://www.oscars.org/science-technology/sci-tech-projects/aces 기반
 fn aces_tone_map(hdr: vec3<f32>) -> vec3<f32> {
     let m1 = mat3x3(
         0.59719, 0.07600, 0.02840,
@@ -247,14 +247,13 @@ fn vs_main(
     @builtin(vertex_index) vi: u32,
 ) -> VertexOutput {
     var out: VertexOutput;
-    // Generate a triangle that covers the whole screen
+    // 화면 전체를 덮는 삼각형을 생성합니다.
     out.uv = vec2<f32>(
         f32((vi << 1u) & 2u),
         f32(vi & 2u),
     );
     out.clip_position = vec4<f32>(out.uv * 2.0 - 1.0, 0.0, 1.0);
-    // We need to invert the y coordinate so the image
-    // is not upside down
+    // 이미지가 뒤집히지 않도록 y 좌표를 반전시켜야 합니다.
     out.uv.y = 1.0 - out.uv.y;
     return out;
 }
@@ -275,7 +274,7 @@ fn fs_main(vs: VertexOutput) -> @location(0) vec4<f32> {
 }
 ```
 
-With those in place, we can start using our HDR texture in our core render pipeline. First, we need to add the new `HdrPipeline` to `State`:
+이제 이들을 배치했으니 핵심 렌더 파이프라인에서 HDR 텍스처를 사용해 봅시다. 먼저, `State`에 새로운 `HdrPipeline`을 추가해야 합니다:
 
 ```rust
 // lib.rs
@@ -306,7 +305,7 @@ impl State {
 }
 ```
 
-Then, when we resize the window, we need to call `resize()` on our `HdrPipeline`:
+그런 다음, 창 크기를 조절할 때 `HdrPipeline`의 `resize()`를 호출해야 합니다:
 
 ```rust
 fn resize(&mut self, width: u32, height: u32) {
@@ -320,7 +319,7 @@ fn resize(&mut self, width: u32, height: u32) {
 }
 ```
 
-Next, in `render()`, we need to switch the `RenderPass` to use our HDR texture instead of the surface texture:
+다음으로, `render()`에서 `RenderPass`가 서피스 텍스처 대신 HDR 텍스처를 사용하도록 전환해야 합니다:
 
 ```rust
 // render()
@@ -345,53 +344,53 @@ let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
 });
 ```
 
-Finally, after we draw all the objects in the frame, we can run our tonemapper with the surface texture as the output:
+마지막으로, 프레임의 모든 객체를 그린 후, 서피스 텍스처를 출력으로 사용하여 톤매퍼를 실행할 수 있습니다:
 
 ```rust
 // NEW!
-// Apply tonemapping
+// 톤 매핑 적용
 self.hdr.process(&mut encoder, &view);
 ```
 
-It's a pretty easy switch. Here's the image before using HDR:
+전환은 매우 쉽습니다. HDR을 사용하기 전의 이미지입니다:
 
 ![before hdr](./before-hdr.png)
 
-Here's what it looks like after implementing HDR:
+HDR을 구현한 후의 모습입니다:
 
 ![after hdr](./after-hdr.png)
 
-## Loading HDR textures
+## HDR 텍스처 로딩하기
 
-Now that we have an HDR render buffer, we can start leveraging HDR textures to their fullest. One of the primary uses for HDR textures is to store lighting information in the form of an environment map.
+이제 HDR 렌더 버퍼가 있으니, HDR 텍스처를 최대한 활용할 수 있습니다. HDR 텍스처의 주요 용도 중 하나는 환경 맵(environment map) 형태로 조명 정보를 저장하는 것입니다.
 
-This map can be used to light objects, display reflections and also to make a skybox. We're going to create a skybox using HDR texture, but first, we need to talk about how environment maps are stored.
+이 맵은 객체를 비추고, 반사를 표시하며, 스카이박스를 만드는 데 사용될 수 있습니다. HDR 텍스처를 사용하여 스카이박스를 만들 것이지만, 그 전에 환경 맵이 어떻게 저장되는지에 대해 이야기해야 합니다.
 
-## Equirectangular textures
+## 정거원통도법 텍스처 (Equirectangular textures)
 
-An equirectangular texture is a texture where a sphere is stretched across a rectangular surface using what's known as an equirectangular projection. This map of the Earth is an example of this projection.
+정거원통도법 텍스처는 정거원통도법(equirectangular projection)이라는 것을 사용하여 구를 직사각형 표면에 펼쳐놓은 텍스처입니다. 이 지구 지도는 이 투영법의 한 예입니다.
 
 ![map of the earth](https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Equirectangular_projection_SW.jpg/1024px-Equirectangular_projection_SW.jpg)
 
-This projection maps the longitude values of the sphere to the horizontal coordinates of the texture. The latitude values get mapped to the vertical coordinates. This means that the vertical middle of the texture is the equator (0° latitude) of the sphere, the horizontal middle is the prime meridian (0° longitude) of the sphere, the left and right edges of the texture are the anti-meridian (+180°/-180° longitude) the top and bottom edges of the texture are the north pole (90° latitude) and south pole (-90° latitude), respectively.
+이 투영법은 구의 경도 값을 텍스처의 수평 좌표에 매핑합니다. 위도 값은 수직 좌표에 매핑됩니다. 이는 텍스처의 수직 중앙이 구의 적도(위도 0°), 수평 중앙이 본초 자오선(경도 0°), 텍스처의 왼쪽과 오른쪽 가장자리가 대척 자오선(경도 +180°/-180°), 텍스처의 위쪽과 아래쪽 가장자리가 각각 북극(위도 90°)과 남극(위도 -90°)이라는 것을 의미합니다.
 
 ![equirectangular diagram](./equirectangular.svg)
 
-This simple projection is easy to use, making it one of the most popular projections for storing spherical textures. You can see the particular environment map we are going to use below.
+이 간단한 투영법은 사용하기 쉬워 구형 텍스처를 저장하는 데 가장 인기 있는 투영법 중 하나입니다. 아래에서 우리가 사용할 특정 환경 맵을 볼 수 있습니다.
 
 ![equirectangular skybox](./kloofendal_43d_clear_puresky.jpg)
 
-## Cube Maps
+## 큐브맵 (Cube Maps)
 
-While we can technically use an equirectangular map directly, as long as we do some math to figure out the correct coordinates, it is a lot more convenient to convert our environment map into a cube map.
+기술적으로는 정거원통도법 맵을 직접 사용할 수 있지만(올바른 좌표를 계산하기 위한 약간의 수학만 한다면), 환경 맵을 큐브맵으로 변환하는 것이 훨씬 편리합니다.
 
 <div class="info">
 
-A cube map is a special kind of texture that has six layers. Each layer corresponds to a different face of an imaginary cube that is aligned to the X, Y and Z axes. The layers are stored in the following order: +X, -X, +Y, -Y, +Z, -Z. 
+큐브맵은 6개의 레이어를 가진 특별한 종류의 텍스처입니다. 각 레이어는 X, Y, Z 축에 정렬된 가상의 큐브의 다른 면에 해당합니다. 레이어는 +X, -X, +Y, -Y, +Z, -Z 순서로 저장됩니다.
 
 </div>
 
-To prepare to store the cube texture, we are going to create a new struct called `CubeTexture` in `texture.rs`.
+큐브 텍스처를 저장하기 위해 준비하기 위해 `texture.rs`에 `CubeTexture`라는 새로운 구조체를 만들겠습니다.
 
 ```rust
 pub struct CubeTexture {
@@ -416,7 +415,7 @@ impl CubeTexture {
             size: wgpu::Extent3d {
                 width,
                 height,
-                // A cube has 6 sides, so we need 6 layers
+                // 큐브는 6개의 면을 가지므로 6개의 레이어가 필요합니다.
                 depth_or_array_layers: 6,
             },
             mip_level_count,
@@ -461,13 +460,13 @@ impl CubeTexture {
 }
 ```
 
-With this, we can now write the code to load the HDR into a cube texture.
+이제 HDR을 큐브 텍스처로 로드하는 코드를 작성할 수 있습니다.
 
-## Compute shaders
+## 컴퓨트 셰이더 (Compute shaders)
 
-Up to this point, we've been exclusively using render pipelines, but I felt this was a good time to introduce the compute pipelines and, by extension, compute shaders. Compute pipelines are a lot easier to set up. All you need is to tell the pipeline what resources you want to use, what code you want to run, and how many threads you'd like the GPU to use when running your code. We're going to use a compute shader to give each pixel in our cube texture a color from the HDR image.
+지금까지는 렌더 파이프라인만 독점적으로 사용했지만, 지금이 컴퓨트 파이프라인과 그 확장인 컴퓨트 셰이더를 소개하기 좋은 시기라고 생각했습니다. 컴퓨트 파이프라인은 설정하기가 훨씬 쉽습니다. 파이프라인에 사용할 리소스, 실행할 코드, 그리고 코드를 실행할 때 GPU가 사용할 스레드 수를 알려주기만 하면 됩니다. 우리는 컴퓨트 셰이더를 사용하여 큐브 텍스처의 각 픽셀에 HDR 이미지의 색상을 부여할 것입니다.
 
-Before we can use compute shaders, we need to enable them in wgpu. We can do that by changing the line where we specify what features we want to use. In `lib.rs`, change the code where we request a device:
+컴퓨트 셰이더를 사용하기 전에 wgpu에서 활성화해야 합니다. 사용하려는 기능을 지정하는 줄을 변경하여 이를 수행할 수 있습니다. `lib.rs`에서 장치를 요청하는 코드를 변경하세요:
 
 ```rust
 let (device, queue) = adapter
@@ -487,9 +486,9 @@ let (device, queue) = adapter
 
 <div class="warn">
 
-You may have noted that we have switched from `downlevel_webgl2_defaults()` to `downlevel_defaults()`. This means that we are dropping support for WebGL2. The reason for this is that WebGL2 doesn't support the compute shaders. WebGPU was built with compute shaders in mind. As of writing, the only browser that supports WebGPU is Chrome and some experimental browsers such as Firefox Nightly.
+`downlevel_webgl2_defaults()`에서 `downlevel_defaults()`로 전환한 것을 눈치챘을 것입니다. 이는 WebGL2 지원을 중단한다는 의미입니다. 그 이유는 WebGL2가 컴퓨트 셰이더를 지원하지 않기 때문입니다. WebGPU는 컴퓨트 셰이더를 염두에 두고 만들어졌습니다. 이 글을 쓰는 시점에서 WebGPU를 지원하는 유일한 브라우저는 Chrome과 Firefox Nightly와 같은 일부 실험적인 브라우저뿐입니다.
 
-Consequently, we are going to remove the WebGL feature from `Cargo.toml`. This line in particular:
+따라서 `Cargo.toml`에서 WebGL 기능을 제거할 것입니다. 특히 이 줄입니다:
 
 ```toml
 wgpu = { version = "25.0", features = ["webgl"]}
@@ -497,7 +496,7 @@ wgpu = { version = "25.0", features = ["webgl"]}
 
 </div>
 
-Now that we've told wgpu that we want to use the compute shaders, let's create a struct in `resource.rs` that we'll use to load the HDR image into our cube map.
+이제 wgpu에 컴퓨트 셰이더를 사용하겠다고 알렸으니, `resource.rs`에 HDR 이미지를 큐브맵으로 로드하는 데 사용할 구조체를 만들어 봅시다.
 
 ```rust
 pub struct HdrLoader {
@@ -623,8 +622,8 @@ impl HdrLoader {
             dst_size,
             self.texture_format,
             1,
-            // We are going to write to `dst` texture so we
-            // need to use a `STORAGE_BINDING`.
+            // `dst` 텍스처에 쓸 것이므로
+            // `STORAGE_BINDING`을 사용해야 합니다.
             wgpu::TextureUsages::STORAGE_BINDING
                 | wgpu::TextureUsages::TEXTURE_BINDING,
             wgpu::FilterMode::Nearest,
@@ -633,11 +632,10 @@ impl HdrLoader {
 
         let dst_view = dst.texture().create_view(&wgpu::TextureViewDescriptor {
             label,
-            // Normally, you'd use `TextureViewDimension::Cube`
-            // for a cube texture, but we can't use that
-            // view dimension with a `STORAGE_BINDING`.
-            // We need to access the cube texture layers
-            // directly.
+            // 보통 큐브 텍스처에는 `TextureViewDimension::Cube`를
+            // 사용하지만, `STORAGE_BINDING`과 함께
+            // 해당 뷰 차원을 사용할 수 없습니다.
+            // 큐브 텍스처 레이어에 직접 접근해야 합니다.
             dimension: Some(wgpu::TextureViewDimension::D2Array),
             ..Default::default()
         });
@@ -674,13 +672,13 @@ impl HdrLoader {
 }
 ```
 
-The `dispatch_workgroups` call tells the GPU to run our code in batches called workgroups. Each workgroup has a number of worker threads called invocations that run the code in parallel. Workgroups are organized as a 3d grid with the dimensions we pass to `dispatch_workgroups`.
+`dispatch_workgroups` 호출은 GPU에게 워크그룹(workgroup)이라는 배치 단위로 코드를 실행하도록 지시합니다. 각 워크그룹에는 인보케이션(invocation)이라고 불리는 여러 작업자 스레드가 있어 코드를 병렬로 실행합니다. 워크그룹은 우리가 `dispatch_workgroups`에 전달하는 차원을 가진 3D 그리드로 구성됩니다.
 
-In this example, we have a workgroup grid divided into 16x16 chunks and storing the layer in the z dimension.
+이 예제에서는 워크그룹 그리드를 16x16 청크로 나누고 z 차원에 레이어를 저장합니다.
 
-## The compute shader
+## 컴퓨트 셰이더
 
-Now, let's write a compute shader that will convert our equirectangular texture to a cube texture. Create a file called `equirectangular.wgsl`. We're going to break it down chunk by chunk.
+이제 정거원통도법 텍스처를 큐브 텍스처로 변환하는 컴퓨트 셰이더를 작성해 보겠습니다. `equirectangular.wgsl`이라는 파일을 만드세요. 청크별로 나누어 설명하겠습니다.
 
 ```wgsl
 const PI: f32 = 3.1415926535897932384626433832795;
@@ -692,10 +690,10 @@ struct Face {
 }
 ```
 
-Two things here:
+여기서 두 가지 사항이 있습니다:
 
-1. WGSL doesn't have a built-in for PI, so we need to specify it ourselves.
-2. each face of the cube map has an orientation to it, so we need to store that.
+1. WGSL에는 PI에 대한 내장 상수가 없으므로 직접 지정해야 합니다.
+2. 큐브맵의 각 면에는 방향성이 있으므로 이를 저장해야 합니다.
 
 ```wgsl
 @group(0)
@@ -707,11 +705,11 @@ var src: texture_2d<f32>;
 var dst: texture_storage_2d_array<rgba32float, write>;
 ```
 
-Here, we have the only two bindings we need. The equirectangular `src` texture and our `dst` cube texture. Some things to note about `dst`:
+여기에는 필요한 두 개의 바인딩만 있습니다. 정거원통도법 `src` 텍스처와 `dst` 큐브 텍스처입니다. `dst`에 대해 주목할 몇 가지 사항:
 
-1. While `dst` is a cube texture, it's stored as an array of 2d textures.
-2. The type of binding we're using here is a storage texture. An array storage texture, to be precise. This is a unique binding only available to compute shaders. It allows us to write directly to the texture.
-3. When using a storage texture binding, we need to specify the format of the texture. If you try to bind a texture with a different format, wgpu will panic.
+1. `dst`는 큐브 텍스처이지만, 2D 텍스처 배열로 저장됩니다.
+2. 여기서 사용하는 바인딩 유형은 스토리지 텍스처(storage texture)입니다. 정확히는 배열 스토리지 텍스처입니다. 이는 컴퓨트 셰이더에서만 사용할 수 있는 고유한 바인딩으로, 텍스처에 직접 쓸 수 있게 해줍니다.
+3. 스토리지 텍스처 바인딩을 사용할 때는 텍스처의 포맷을 지정해야 합니다. 다른 포맷의 텍스처를 바인딩하려고 하면 wgpu가 패닉을 일으킵니다.
 
 ```wgsl
 @compute
@@ -720,9 +718,9 @@ fn compute_equirect_to_cubemap(
     @builtin(global_invocation_id)
     gid: vec3<u32>,
 ) {
-    // If texture size is not divisible by 32, we
-    // need to make sure we don't try to write to
-    // pixels that don't exist.
+    // 텍스처 크기가 32로 나누어 떨어지지 않으면,
+    // 존재하지 않는 픽셀에 쓰려고 시도하지 않도록
+    // 해야 합니다.
     if gid.x >= u32(textureDimensions(dst).x) {
         return;
     }
@@ -766,37 +764,37 @@ fn compute_equirect_to_cubemap(
         ),
     );
 
-    // Get texture coords relative to cubemap face
+    // 큐브맵 면에 상대적인 텍스처 좌표 얻기
     let dst_dimensions = vec2<f32>(textureDimensions(dst));
     let cube_uv = vec2<f32>(gid.xy) / dst_dimensions * 2.0 - 1.0;
 
-    // Get spherical coordinate from cube_uv
+    // cube_uv로부터 구면 좌표 얻기
     let face = FACES[gid.z];
     let spherical = normalize(face.forward + face.right * cube_uv.x + face.up * cube_uv.y);
 
-    // Get coordinate on the equirectangular texture
+    // 정거원통도법 텍스처 상의 좌표 얻기
     let inv_atan = vec2(0.1591, 0.3183);
     let eq_uv = vec2(atan2(spherical.z, spherical.x), asin(spherical.y)) * inv_atan + 0.5;
     let eq_pixel = vec2<i32>(eq_uv * vec2<f32>(textureDimensions(src)));
 
-    // We use textureLoad() as textureSample() is not allowed in compute shaders
+    // textureSample()은 컴퓨트 셰이더에서 허용되지 않으므로 textureLoad()를 사용합니다.
     var sample = textureLoad(src, eq_pixel, 0);
 
     textureStore(dst, gid.xy, gid.z, sample);
 }
 ```
 
-While I commented in the previous code, there are some things I want to go over that wouldn't fit well in a comment.
+이전 코드에 주석을 달았지만, 주석에 잘 맞지 않는 몇 가지 사항을 짚고 넘어가고 싶습니다.
 
-The `workgroup_size` decorator tells the dimensions of the workgroup's local grid of invocations. Because we are dispatching one workgroup for every pixel in the texture, we have each workgroup be a 16x16x1 grid. This means that each workgroup can have 256 threads to work with.
+`workgroup_size` 데코레이터는 워크그룹의 로컬 인보케이션 그리드 차원을 알려줍니다. 텍스처의 모든 픽셀에 대해 하나의 워크그룹을 디스패치하므로, 각 워크그룹은 16x16x1 그리드가 됩니다. 이는 각 워크그룹이 256개의 스레드를 가질 수 있다는 의미입니다.
 
 <div class="warn">
 
-For WebGPU, each workgroup can only have a max of 256 threads (also called invocations).
+WebGPU의 경우, 각 워크그룹은 최대 256개의 스레드(인보케이션이라고도 함)만 가질 수 있습니다.
 
 </div>
 
-With this, we can load the environment map in the `new()` function:
+이제 `new()` 함수에서 환경 맵을 로드할 수 있습니다:
 
 ```rust
 let hdr_loader = resources::HdrLoader::new(&device);
@@ -810,11 +808,11 @@ let sky_texture = hdr_loader.from_equirectangular_bytes(
 )?;
 ```
 
-## Skybox
+## 스카이박스 (Skybox)
 
-Now that we have an environment map to render let's use it to make our skybox. There are different ways to render a skybox. A standard way is to render a cube and map the environment map on it. While that method works, it can have some artifacts in the corners and edges where the cube's faces meet.
+이제 렌더링할 환경 맵이 있으니, 이를 사용하여 스카이박스를 만들어 봅시다. 스카이박스를 렌더링하는 방법은 여러 가지가 있습니다. 표준적인 방법은 큐브를 렌더링하고 그 위에 환경 맵을 매핑하는 것입니다. 이 방법도 작동하지만, 큐브의 면이 만나는 모서리와 가장자리에서 일부 아티팩트가 발생할 수 있습니다.
 
-Instead, we are going to render to the entire screen, compute the view direction from each pixel and use that to sample the texture. First, we need to create a bindgroup for the environment map so that we can use it for rendering. Add the following to `new()`:
+대신, 우리는 전체 화면에 렌더링하고, 각 픽셀에서 뷰 방향을 계산하여 텍스처를 샘플링할 것입니다. 먼저, 렌더링에 사용할 수 있도록 환경 맵에 대한 바인드그룹을 만들어야 합니다. `new()`에 다음을 추가하세요:
 
 ```rust
 let environment_layout =
@@ -856,7 +854,7 @@ let environment_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor
 });
 ```
 
-Now that we have the bindgroup, we need a render pipeline to render the skybox.
+이제 바인드그룹이 있으니, 스카이박스를 렌더링할 렌더 파이프라인이 필요합니다.
 
 ```rust
 // NEW!
@@ -879,7 +877,7 @@ let sky_pipeline = {
 };
 ```
 
-One thing to note here. We added the primitive format to `create_render_pipeline()`. Also, we changed the depth compare function to `CompareFunction::LessEqual` (we'll discuss why when we go over the sky shader). Here are the changes to that:
+여기서 주목할 점이 하나 있습니다. `create_render_pipeline()`에 프리미티브 포맷을 추가했습니다. 또한, 깊이 비교 함수를 `CompareFunction::LessEqual`로 변경했습니다 (왜 그런지는 스카이 셰이더를 다룰 때 논의할 것입니다). 해당 변경 사항은 다음과 같습니다:
 
 ```rust
 fn create_render_pipeline(
@@ -911,7 +909,7 @@ fn create_render_pipeline(
 }
 ```
 
-Don't forget to add the new bindgroup and pipeline to the to `State`.
+새로운 바인드그룹과 파이프라인을 `State`에 추가하는 것을 잊지 마세요.
 
 ```rust
 pub struct State {
@@ -938,7 +936,7 @@ impl State {
 }
 ```
 
-Now let's cover `sky.wgsl`.
+이제 `sky.wgsl`을 다루어 봅시다.
 
 ```wgsl
 struct Camera {
@@ -989,15 +987,15 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 }
 ```
 
-Let's break this down:
+이것을 분석해 봅시다:
 
-1. We create a triangle twice the size of the screen.
-2. In the fragment shader, we get the view direction from the clip position. We use the inverse projection matrix to convert the clip coordinates to view direction. Then, we use the inverse view matrix to get the direction into world space, as that's what we need to sample the sky box correctly.
-3. We then sample the sky texture with the view direction.
+1. 화면 크기의 두 배인 삼각형을 만듭니다.
+2. 프래그먼트 셰이더에서 클립 위치로부터 뷰 방향을 얻습니다. 역 투영 행렬을 사용하여 클립 좌표를 뷰 방향으로 변환합니다. 그런 다음, 역 뷰 행렬을 사용하여 방향을 월드 공간으로 변환합니다. 스카이 박스를 올바르게 샘플링하려면 월드 공간이 필요하기 때문입니다.
+3. 그런 다음 뷰 방향으로 스카이 텍스처를 샘플링합니다.
 
 <!-- ![debugging skybox](./debugging-skybox.png) -->
 
-For this to work, we need to change our camera uniforms a bit. We need to add the inverse view matrix and inverse projection matrix to `CameraUniform` struct.
+이것이 작동하려면 카메라 유니폼을 약간 변경해야 합니다. `CameraUniform` 구조체에 역 뷰 행렬과 역 투영 행렬을 추가해야 합니다.
 
 ```rust
 #[repr(C)]
@@ -1035,7 +1033,7 @@ impl CameraUniform {
 }
 ```
 
-Make sure to change the `Camera` definition in `shader.wgsl`, and `light.wgsl`. Just as a reminder, it looks like this:
+`shader.wgsl`과 `light.wgsl`에서 `Camera` 정의를 변경하는 것을 잊지 마세요. 참고로, 다음과 같이 생겼습니다:
 
 ```wgsl
 struct Camera {
@@ -1050,19 +1048,19 @@ var<uniform> camera: Camera;
 
 <div class="info">
 
-You may have noticed that we removed the `OPENGL_TO_WGPU_MATRIX`. The reason for this is that it was messing with the projection of the skybox.
+`OPENGL_TO_WGPU_MATRIX`를 제거한 것을 눈치채셨을 겁니다. 그 이유는 스카이박스의 투영을 망가뜨리고 있었기 때문입니다.
 
 ![projection error](./project-error.png)
 
-Technically, it wasn't needed, so I felt fine removing it.
+기술적으로 필요하지 않았기 때문에 제거하는 것이 괜찮다고 생각했습니다.
 
 </div>
 
-## Reflections
+## 반사 (Reflections)
 
-Now that we have a sky, we can mess around with using it for lighting. This won't be physically accurate (we'll look into that later). That being said, we have the environment map, so we might as well use it.
+이제 하늘이 생겼으니, 이를 조명에 사용하는 것을 시도해 볼 수 있습니다. 이것은 물리적으로 정확하지는 않을 것입니다(나중에 그것에 대해 알아볼 것입니다). 그럼에도 불구하고 환경 맵이 있으니 사용하는 것이 좋겠습니다.
 
-In order to do that though, we need to change our shader to do lighting in world space instead of tangent space because our environment map is in world space. Because there are a lot of changes I'll post the whole shader here:
+하지만 그렇게 하려면, 우리의 환경 맵이 월드 공간에 있기 때문에 셰이더를 탄젠트 공간 대신 월드 공간에서 조명을 수행하도록 변경해야 합니다. 많은 변경 사항이 있으므로 여기에 전체 셰이더를 게시하겠습니다:
 
 ```wgsl
 // Vertex shader
@@ -1168,13 +1166,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let object_normal: vec4<f32> = textureSample(t_normal, s_normal, in.tex_coords);
 
     // NEW!
-    // Adjust the tangent and bitangent using the Gramm-Schmidt process
-    // This makes sure that they are perpendicular to each other and the
-    // normal of the surface.
+    // 그람-슈미트 직교화 과정을 사용하여 탄젠트와 바이탄젠트를 조정합니다.
+    // 이것은 이들이 서로 수직이고 표면의 노멀과도 수직임을 보장합니다.
     let world_tangent = normalize(in.world_tangent - dot(in.world_tangent, in.world_normal) * in.world_normal);
     let world_bitangent = cross(world_tangent, in.world_normal);
 
-    // Convert the normal sample to world space
+    // 노멀 샘플을 월드 공간으로 변환합니다.
     let TBN = mat3x3(
         world_tangent,
         world_bitangent,
@@ -1183,7 +1180,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let tangent_normal = object_normal.xyz * 2.0 - 1.0;
     let world_normal = TBN * tangent_normal;
 
-    // Create the lighting vectors
+    // 조명 벡터를 생성합니다.
     let light_dir = normalize(light.position - in.world_position);
     let view_dir = normalize(in.world_view_position - in.world_position);
     let half_dir = normalize(view_dir + light_dir);
@@ -1195,7 +1192,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let specular_color = specular_strength * light.color;
 
     // NEW!
-    // Calculate reflections
+    // 반사 계산
     let world_reflect = reflect(-view_dir, world_normal);
     let reflection = textureSample(env_map, env_sampler, world_reflect).rgb;
     let shininess = 0.1;
@@ -1206,21 +1203,17 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 }
 ```
 
-A little note on the reflection math. The `view_dir` gives us the direction to the camera from the surface. The reflection math needs the direction from the camera to the surface, so we negate `view_dir`. We then use `wgsl`'s built-in `reflect` function to reflect the inverted `view_dir` about the `world_normal`. This gives us a direction that we can use to sample the environment map and get the color of the sky in that direction. Just looking at the reflection component gives us the following:
+반사 수학에 대한 약간의 참고 사항입니다. `view_dir`는 표면에서 카메라로의 방향을 제공합니다. 반사 수학은 카메라에서 표면으로의 방향이 필요하므로 `view_dir`를 부정합니다. 그런 다음 `wgsl`의 내장 `reflect` 함수를 사용하여 반전된 `view_dir`를 `world_normal`에 대해 반사시킵니다. 이것은 환경 맵을 샘플링하고 해당 방향의 하늘 색상을 얻는 데 사용할 수 있는 방향을 제공합니다. 반사 구성 요소만 보면 다음과 같습니다:
 
 ![just-reflections](./just-reflections.png)
 
-Here's the finished scene:
+완성된 씬입니다:
 
 ![with-reflections](./with-reflections.png)
 
-## Output too dark on WebGPU?
+## WebGPU에서 출력이 너무 어두운가요?
 
-WebGPU doesn't support using sRGB texture formats as the
-output for a surface. We can get around this by making the
-texture view used to render use the sRGB version of the
-format. To do this we need to change the surface config
-we use to allow view formats with sRGB.
+WebGPU는 서피스(surface)의 출력으로 sRGB 텍스처 포맷을 사용하는 것을 지원하지 않습니다. 렌더링에 사용되는 텍스처 뷰가 포맷의 sRGB 버전을 사용하도록 하여 이 문제를 해결할 수 있습니다. 이를 위해 sRGB를 사용하는 뷰 포맷을 허용하도록 서피스 구성을 변경해야 합니다.
 
 ```rust
 let config = wgpu::SurfaceConfiguration {
@@ -1236,8 +1229,7 @@ let config = wgpu::SurfaceConfiguration {
 };
 ```
 
-Then we need to create a view with sRGB enabled in
-`State::render()`.
+그런 다음 `State::render()`에서 sRGB가 활성화된 뷰를 생성해야 합니다.
 
 ```rust
 let view = output
@@ -1248,19 +1240,15 @@ let view = output
     });
 ```
 
-You may have noticed as well that in `HdrPipeline::new()`
-we use `config.format.add_srgb_suffix()` when creating
-the render pipeline. This is required as if we don't
-the sRGB enabled `TextureView` won't work with the
-render pipeline.
+또한 `HdrPipeline::new()`에서 렌더 파이프라인을 생성할 때 `config.format.add_srgb_suffix()`를 사용하는 것을 눈치챘을 것입니다. sRGB가 활성화된 `TextureView`가 렌더 파이프라인과 작동하지 않으므로 이것이 필요합니다.
 
-With that you should get the sRGB output as expected.
+이렇게 하면 sRGB 출력을 예상대로 얻을 수 있습니다.
 
-## Demo
+## 데모
 
 <div class="warn">
 
-If your browser doesn't support WebGPU, this example won't work for you.
+브라우저가 WebGPU를 지원하지 않으면 이 예제는 작동하지 않습니다.
 
 </div>
 

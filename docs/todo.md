@@ -1,11 +1,11 @@
-# Coming Soon!
+# 준비 중입니다.
 
-This section has not yet been completed.
+이 섹션은 아직 완료되지 않았습니다.
 
 <!-- 
 
-We need a way to link source code and images!
+소스 코드와 이미지를 연결할 방법이 필요합니다!
 
  -->
-<!-- Make links between pages -->
-<!-- Remove `tutorial#` from beginner tutorials -->
+<!-- 페이지 간 링크 만들기 -->
+<!-- 초보자 튜토리얼에서 `tutorial#` 제거하기 -->

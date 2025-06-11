@@ -1,26 +1,26 @@
-# The Depth Buffer
+# 깊이 버퍼 (The Depth Buffer)
 
-Let's take a closer look at the last example from an angle.
+지난 예제를 다른 각도에서 자세히 살펴보겠습니다.
 
 ![depth_problems.png](./depth_problems.png)
 
-Models that should be in the back are getting rendered ahead of those in the front. This is caused by the draw order. By default, pixel data from a new object will replace old pixel data.
+뒤에 있어야 할 모델이 앞에 있는 모델보다 먼저 렌더링되고 있습니다. 이는 그리기 순서(draw order) 때문에 발생합니다. 기본적으로, 새로운 객체의 픽셀 데이터는 이전 픽셀 데이터를 덮어씁니다.
 
-There are two ways to solve this: sort the data from back to front or use what's known as a depth buffer.
+이 문제를 해결하는 방법에는 두 가지가 있습니다: 데이터를 뒤에서 앞으로 정렬하거나, 깊이 버퍼(depth buffer)라고 알려진 것을 사용하는 것입니다.
 
-## Sorting from back to front
+## 뒤에서 앞으로 정렬하기
 
-This is the go-to method for 2D rendering as it's pretty easy to know what's supposed to go in front of what. You can just use the z-order. In 3d rendering, it gets a little trickier because the order of the objects changes based on the camera angle.
+2D 렌더링에서는 무엇이 앞에 와야 하는지 알기 쉽기 때문에 이 방법이 주로 사용됩니다. 그냥 z-순서(z-order)를 사용하면 됩니다. 3D 렌더링에서는 카메라 각도에 따라 객체의 순서가 바뀌기 때문에 좀 더 까다로워집니다.
 
-A simple way of doing this is to sort all the objects by their distance from the camera's position. There are flaws with this method, though, as when a large object is behind a small object, parts of the large object that should be in front of the small object will be rendered behind it. We'll also run into issues with objects that overlap *themselves*.
+이를 간단하게 처리하는 방법은 모든 객체를 카메라 위치로부터의 거리에 따라 정렬하는 것입니다. 하지만 이 방법에는 결함이 있습니다. 예를 들어 큰 객체가 작은 객체 뒤에 있을 때, 작은 객체보다 앞에 있어야 할 큰 객체의 일부가 뒤에 렌더링될 수 있습니다. 또한 *자기 자신*과 겹치는 객체에서도 문제가 발생합니다.
 
-If we want to do this properly, we need to have pixel-level precision. That's where a *depth buffer* comes in.
+이를 제대로 처리하려면 픽셀 수준의 정밀도가 필요합니다. 바로 이 지점에서 *깊이 버퍼*가 등장합니다.
 
-## A pixels depth
+## 픽셀의 깊이
 
-A depth buffer is a black and white texture that stores the z-coordinate of rendered pixels. Wgpu can use this when drawing new pixels to determine whether to replace or keep the data. This technique is called depth testing. This will fix our draw order problem without needing us to sort our objects!
+깊이 버퍼는 렌더링된 픽셀의 z-좌표를 저장하는 흑백 텍스처입니다. wgpu는 새로운 픽셀을 그릴 때 이 정보를 사용하여 기존 데이터를 덮어쓸지 유지할지 결정할 수 있습니다. 이 기술을 깊이 테스트(depth testing)라고 합니다. 이 방법을 사용하면 객체를 정렬할 필요 없이 그리기 순서 문제를 해결할 수 있습니다!
 
-Let's make a function to create the depth texture in `texture.rs`.
+`texture.rs`에 깊이 텍스처를 생성하는 함수를 만들어 봅시다.
 
 ```rust
 impl Texture {
@@ -66,19 +66,19 @@ impl Texture {
 }
 ```
 
-1. We need the DEPTH_FORMAT for creating the depth stage of the `render_pipeline` and for creating the depth texture itself.
-2. Our depth texture needs to be the same size as our screen if we want things to render correctly. We can use our `config` to ensure our depth texture is the same size as our surface textures.
-3. Since we are rendering to this texture, we need to add the `RENDER_ATTACHMENT` flag to it.
-4. We technically don't *need* a sampler for a depth texture, but our `Texture` struct requires it, and we need one if we ever want to sample it.
-5. If we do decide to render our depth texture, we need to use `CompareFunction::LessEqual`. This is due to how the `sampler_comparison` and `textureSampleCompare()` interact with the `texture()` function in GLSL.
+1.  `render_pipeline`의 깊이 단계(depth stage)를 만들고 깊이 텍스처 자체를 생성하기 위해 `DEPTH_FORMAT`이 필요합니다.
+2.  렌더링이 올바르게 되려면 깊이 텍스처가 화면과 동일한 크기여야 합니다. `config`를 사용하여 깊이 텍스처가 서피스 텍스처와 같은 크기가 되도록 할 수 있습니다.
+3.  이 텍스처에 렌더링할 것이므로, `RENDER_ATTACHMENT` 플래그를 추가해야 합니다.
+4.  기술적으로 깊이 텍스처에 샘플러(sampler)가 *반드시* 필요한 것은 아니지만, 우리의 `Texture` 구조체는 이를 요구하며, 만약 텍스처를 샘플링하고 싶다면 샘플러가 필요합니다.
+5.  만약 깊이 텍스처를 렌더링하기로 결정한다면 `CompareFunction::LessEqual`를 사용해야 합니다. 이는 `sampler_comparison`과 `textureSampleCompare()`가 GLSL의 `texture()` 함수와 상호 작용하는 방식 때문입니다.
 
-We create our `depth_texture` in `State::new()`.
+`State::new()`에서 `depth_texture`를 생성합니다.
 
 ```rust
 let depth_texture = texture::Texture::create_depth_texture(&device, &config, "depth_texture");
 ```
 
-We need to modify our `render_pipeline` to allow depth testing.
+깊이 테스트를 허용하도록 `render_pipeline`을 수정해야 합니다.
 
 ```rust
 let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -94,28 +94,28 @@ let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescrip
 });
 ```
 
-1. The `depth_compare` function tells us when to discard a new pixel. Using `LESS` means pixels will be drawn front to back. Here are the other possible values for a [CompareFunction](https://docs.rs/wgpu/latest/wgpu/enum.CompareFunction.html) that you can use:
+1.  `depth_compare` 함수는 언제 새로운 픽셀을 버릴지 결정합니다. `Less`를 사용하면 픽셀이 앞에서 뒤 순서로 그려진다는 의미입니다. 사용할 수 있는 다른 [CompareFunction](https://docs.rs/wgpu/latest/wgpu/enum.CompareFunction.html) 값들은 다음과 같습니다.
 
-```rust
-#[repr(C)]
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub enum CompareFunction {
-    Undefined = 0,
-    Never = 1,
-    Less = 2,
-    Equal = 3,
-    LessEqual = 4,
-    Greater = 5,
-    NotEqual = 6,
-    GreaterEqual = 7,
-    Always = 8,
-}
-```
+    ```rust
+    #[repr(C)]
+    #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+    #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+    pub enum CompareFunction {
+        Undefined = 0,
+        Never = 1,
+        Less = 2,
+        Equal = 3,
+        LessEqual = 4,
+        Greater = 5,
+        NotEqual = 6,
+        GreaterEqual = 7,
+        Always = 8,
+    }
+    ```
 
-2. There's another type of buffer called a stencil buffer. It's common practice to store the stencil buffer and depth buffer in the same texture. These fields control values for stencil testing. We'll use default values since we aren't using a stencil buffer. We'll cover stencil buffers [later](../../todo).
+2.  스텐실 버퍼(stencil buffer)라고 불리는 또 다른 유형의 버퍼가 있습니다. 일반적으로 스텐실 버퍼와 깊이 버퍼는 동일한 텍스처에 함께 저장됩니다. 이 필드들은 스텐실 테스트(stencil testing)를 위한 값을 제어합니다. 우리는 스텐실 버퍼를 사용하지 않으므로 기본값을 사용합니다. 스텐실 버퍼에 대해서는 [나중에](../../todo) 다루겠습니다.
 
-Don't forget to store the `depth_texture` in `State`.
+`depth_texture`를 `State`에 저장하는 것을 잊지 마세요.
 
 ```rust
 pub struct State {
@@ -135,7 +135,7 @@ async fn new(window: Window) -> Self {
 }
 ```
 
-We need to remember to change the `resize()` method to create a new `depth_texture` and `depth_texture_view`.
+`resize()` 메서드를 변경하여 새로운 `depth_texture`를 생성해야 한다는 점을 기억해야 합니다.
 
 ```rust
 fn resize(&mut self, width: u32, height: u32) {
@@ -147,9 +147,9 @@ fn resize(&mut self, width: u32, height: u32) {
 }
 ```
 
-Make sure you update the `depth_texture` *after* you update `config`. If you don't, your program will crash as the `depth_texture` will be a different size than the `surface` texture.
+`config`를 업데이트한 *후에* `depth_texture`를 업데이트해야 합니다. 그렇지 않으면 `depth_texture`가 `surface` 텍스처와 크기가 달라져 프로그램이 충돌할 것입니다.
 
-The last change we need to make is in the `render()` function. We've created the `depth_texture`, but we're not currently using it. We use it by attaching it to the `depth_stencil_attachment` of a render pass.
+마지막으로 변경해야 할 부분은 `render()` 함수입니다. `depth_texture`를 생성했지만, 현재는 사용하고 있지 않습니다. 이를 렌더 패스(render pass)의 `depth_stencil_attachment`에 첨부하여 사용합니다.
 
 ```rust
 let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -165,16 +165,16 @@ let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
 });
 ```
 
-And that's all we have to do! No shader code is needed! If you run the application, the depth issues will be fixed.
+이것이 우리가 해야 할 전부입니다! 셰이더 코드는 필요하지 않습니다! 애플리케이션을 실행하면 깊이 문제가 해결될 것입니다.
 
 ![forest_fixed.png](./forest_fixed.png)
 
-## Demo
+## 데모
 
 <WasmExample example="tutorial8_depth"></WasmExample>
 
 <AutoGithubLink/>
 
-## Challenge
+## 도전 과제
 
-Since the depth buffer is a texture, we can sample it in the shader. Because it's a depth texture, we'll have to use the `sampler_comparison` uniform type and the `textureSampleCompare` function instead of `sampler` and `sampler2D` respectively. Create a bind group for the depth texture (or reuse an existing one), and render it to the screen.
+깊이 버퍼는 텍스처이므로 셰이더에서 샘플링할 수 있습니다. 이것은 깊이 텍스처이기 때문에, 각각 `sampler`와 `sampler2D` 대신 `sampler_comparison` 유니폼 타입과 `textureSampleCompare` 함수를 사용해야 합니다. 깊이 텍스처를 위한 바인드 그룹을 생성(또는 기존 그룹을 재사용)하고, 이를 화면에 렌더링해 보세요.

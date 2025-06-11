@@ -1,9 +1,8 @@
-# The Surface
+# 표면(The Surface)
 
-## First, some housekeeping: State
+## 먼저, 사전 작업: State
 
-We created state in the last tutorial, now let's put stuff
-in it.
+지난 튜토리얼에서 state를 만들었으니, 이제 그 안에 내용을 채워봅시다.
 
 ```rust
 // lib.rs
@@ -18,11 +17,11 @@ pub struct State {
 }
 ```
 
-I'm glossing over `State`s fields, but they'll make more sense as I explain the code behind these methods.
+`State`의 필드들을 간단히 훑어보겠지만, 이 메서드들 뒤에 있는 코드를 설명하면서 더 명확해질 것입니다.
 
 ## State::new()
 
-The code for this is pretty straightforward, but let's break it down a bit.
+이 코드는 꽤 직관적이지만, 조금 더 자세히 살펴보겠습니다.
 
 ```rust
 impl State {
@@ -30,8 +29,8 @@ impl State {
     async fn new(window: Arc<Window>) -> anyhow::Result<State> {
         let size = window.inner_size();
 
-        // The instance is a handle to our GPU
-        // BackendBit::PRIMARY => Vulkan + Metal + DX12 + Browser WebGPU
+        // instance는 GPU에 대한 핸들입니다.
+        // BackendBit::PRIMARY는 Vulkan + Metal + DX12 + 브라우저 WebGPU를 의미합니다.
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             #[cfg(not(target_arch = "wasm32"))]
             backends: wgpu::Backends::PRIMARY,
@@ -54,55 +53,54 @@ impl State {
     }
 ```
 
-### Instance and Adapter
+### Instance와 Adapter
 
-The `instance` is the first thing you create when using wgpu. Its main purpose
-is to create `Adapter`s and `Surface`s.
+`instance`는 wgpu를 사용할 때 가장 먼저 만드는 것입니다. 이것의 주된 목적은 `Adapter`와 `Surface`를 만드는 것입니다.
 
-The `adapter` is a handle for our actual graphics card. You can use this to get information about the graphics card, such as its name and what backend the adapter uses. We use this to create our `Device` and `Queue` later. Let's discuss the fields of `RequestAdapterOptions`.
+`adapter`는 실제 그래픽 카드에 대한 핸들입니다. 이를 사용하여 그래픽 카드의 이름이나 어댑터가 사용하는 백엔드와 같은 정보를 얻을 수 있습니다. 나중에 `Device`와 `Queue`를 만들 때 이것을 사용합니다. `RequestAdapterOptions`의 필드에 대해 논의해 봅시다.
 
-* `power_preference` has two variants: `LowPower` and `HighPerformance`. `LowPower` will pick an adapter that favors battery life, such as an integrated GPU. `HighPerformance` will pick an adapter for more power-hungry yet more performant GPU's, such as a dedicated graphics card. WGPU will favor `LowPower` if there is no adapter for the `HighPerformance` option.
-* The `compatible_surface` field tells wgpu to find an adapter that can present to the supplied surface.
-* The `force_fallback_adapter` forces wgpu to pick an adapter that will work on all hardware. This usually means that the rendering backend will use a "software" system instead of hardware such as a GPU.
+*   `power_preference`는 `LowPower`와 `HighPerformance` 두 가지 변형이 있습니다. `LowPower`는 내장 GPU와 같이 배터리 수명을 우선시하는 어댑터를 선택합니다. `HighPerformance`는 전용 그래픽 카드처럼 더 많은 전력을 소모하지만 더 성능이 좋은 GPU용 어댑터를 선택합니다. WGPU는 `HighPerformance` 옵션에 대한 어댑터가 없는 경우 `LowPower`를 우선적으로 선택합니다.
+*   `compatible_surface` 필드는 wgpu에게 제공된 표면(surface)에 출력할 수 있는 어댑터를 찾으라고 지시합니다.
+*   `force_fallback_adapter`는 wgpu가 모든 하드웨어에서 작동하는 어댑터를 선택하도록 강제합니다. 이는 일반적으로 렌더링 백엔드가 GPU와 같은 하드웨어 대신 "소프트웨어" 시스템을 사용한다는 것을 의미합니다.
 
 <div class="note">
 
-The options I've passed to `request_adapter` aren't guaranteed to work for all devices, but will work for most of them. If wgpu can't find an adapter with the required permissions, `request_adapter` will return `None`. If you want to get all adapters for a particular backend, you can use `enumerate_adapters`. This will give you an iterator that you can loop over to check if one of the adapters works for your needs.
+제가 `request_adapter`에 전달한 옵션들은 모든 장치에서 작동한다고 보장되지는 않지만, 대부분의 장치에서 작동할 것입니다. wgpu가 필요한 권한을 가진 어댑터를 찾지 못하면 `request_adapter`는 `None`을 반환합니다. 특정 백엔드에 대한 모든 어댑터를 얻고 싶다면 `enumerate_adapters`를 사용할 수 있습니다. 이것은 여러분의 필요에 맞는 어댑터가 있는지 확인하기 위해 반복할 수 있는 이터레이터를 제공합니다.
 
 ```rust
 let adapter = instance
     .enumerate_adapters(wgpu::Backends::all())
     .filter(|adapter| {
-        // Check if this adapter supports our surface
+        // 이 어댑터가 우리 surface를 지원하는지 확인
         adapter.is_surface_supported(&surface)
     })
     .next()
     .unwrap()
 ```
 
-One thing to note is that `enumerate_adapters` isn't available on WASM, so you have to use `request_adapter`.
+한 가지 유의할 점은 `enumerate_adapters`는 WASM에서 사용할 수 없으므로 `request_adapter`를 사용해야 한다는 것입니다.
 
-Another thing to note is that `Adapter`s are locked to a specific backend. If you are on Windows and have two graphics cards, you'll have at least four adapters available to use: 2 Vulkan and 2 DirectX.
+또 다른 점은 `Adapter`는 특정 백엔드에 고정된다는 것입니다. Windows를 사용하고 그래픽 카드가 두 개 있다면, 최소한 4개의 어댑터를 사용할 수 있습니다: 2개의 Vulkan과 2개의 DirectX.
 
-For more fields you can use to refine your search, [check out the docs](https://docs.rs/wgpu/latest/wgpu/struct.Adapter.html).
+검색을 구체화하는 데 사용할 수 있는 더 많은 필드는 [문서](https://docs.rs/wgpu/latest/wgpu/struct.Adapter.html)를 확인하세요.
 
 </div>
 
-### The Surface
+### 표면(The Surface)
 
-The `surface` is the part of the window that we draw to. We need it to draw directly to the screen. Our `window` needs to implement [raw-window-handle](https://crates.io/crates/raw-window-handle)'s `HasRawWindowHandle` trait to create a surface. Fortunately, winit's `Window` fits the bill. We also need it to request our `adapter`.
+`surface`는 우리가 그리는 창(window)의 일부입니다. 화면에 직접 그리기 위해 필요합니다. `surface`를 생성하려면 우리 `window`가 [raw-window-handle](https://crates.io/crates/raw-window-handle)의 `HasRawWindowHandle` 트레이트(trait)를 구현해야 합니다. 다행히 winit의 `Window`가 이 조건을 만족합니다. 또한 `adapter`를 요청하는 데에도 필요합니다.
 
-### Device and Queue
+### Device와 Queue
 
-Let's use the `adapter` to create the device and queue.
+`adapter`를 사용하여 device와 queue를 만들어 봅시다.
 
 ```rust
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: None,
                 required_features: wgpu::Features::empty(),
-                // WebGL doesn't support all of wgpu's features, so if
-                // we're building for the web we'll have to disable some.
+                // WebGL은 wgpu의 모든 기능을 지원하지 않으므로,
+                // 웹용으로 빌드하는 경우 일부 기능을 비활성화해야 합니다.
                 required_limits: if cfg!(target_arch = "wasm32") {
                     wgpu::Limits::downlevel_webgl2_defaults()
                 } else {
@@ -114,27 +112,27 @@ Let's use the `adapter` to create the device and queue.
             .await?;
 ```
 
-The `features` field on `DeviceDescriptor` allows us to specify what extra features we want. For this simple example, I've decided not to use any extra features.
+`DeviceDescriptor`의 `features` 필드를 사용하면 원하는 추가 기능을 지정할 수 있습니다. 이 간단한 예제에서는 추가 기능을 사용하지 않기로 했습니다.
 
 <div class="note">
 
-The graphics card you have limits the features you can use. If you want to use certain features, you may need to limit what devices you support or provide workarounds.
+사용하는 그래픽 카드가 사용할 수 있는 기능을 제한합니다. 특정 기능을 사용하려면 지원하는 장치를 제한하거나 대체 방법을 제공해야 할 수 있습니다.
 
-You can get a list of features supported by your device using `adapter.features()` or `device.features()`.
+`adapter.features()` 또는 `device.features()`를 사용하여 장치에서 지원하는 기능 목록을 얻을 수 있습니다.
 
-You can view a full list of features [here](https://docs.rs/wgpu/latest/wgpu/struct.Features.html).
+전체 기능 목록은 [여기](https://docs.rs/wgpu/latest/wgpu/struct.Features.html)에서 볼 수 있습니다.
 
 </div>
 
-The `limits` field describes the limit of certain types of resources that we can create. We'll use the defaults for this tutorial so we can support most devices. You can view a list of limits [here](https://docs.rs/wgpu/latest/wgpu/struct.Limits.html).
+`limits` 필드는 우리가 생성할 수 있는 특정 유형의 리소스 한계를 설명합니다. 이 튜토리얼에서는 대부분의 장치를 지원하기 위해 기본값을 사용합니다. 제한 목록은 [여기](https://docs.rs/wgpu/latest/wgpu/struct.Limits.html)에서 볼 수 있습니다.
 
-The `memory_hints` field provides the adapter with a preferred memory allocation strategy, if supported. You can view the available options [here](https://wgpu.rs/doc/wgpu/enum.MemoryHints.html).
+`memory_hints` 필드는 지원되는 경우 어댑터에 선호하는 메모리 할당 전략을 제공합니다. 사용 가능한 옵션은 [여기](https://wgpu.rs/doc/wgpu/enum.MemoryHints.html)에서 볼 수 있습니다.
 
 ```rust
         let surface_caps = surface.get_capabilities(&adapter);
-        // Shader code in this tutorial assumes an sRGB surface texture. Using a different
-        // one will result in all the colors coming out darker. If you want to support non
-        // sRGB surfaces, you'll need to account for that when drawing to the frame.
+        // 이 튜토리얼의 셰이더 코드는 sRGB 표면 텍스처를 가정합니다. 다른 것을 사용하면
+        // 모든 색상이 더 어둡게 나옵니다. 비 sRGB 표면을 지원하려면
+        // 프레임에 그릴 때 이를 고려해야 합니다.
         let surface_format = surface_caps.formats.iter()
             .find(|f| f.is_srgb())
             .copied()
@@ -151,39 +149,39 @@ The `memory_hints` field provides the adapter with a preferred memory allocation
         };
 ```
 
-Here we are defining a config for our surface. This will define how the surface creates its underlying `SurfaceTexture`s. We will talk about `SurfaceTexture` when we get to the `render` function. For now, let's talk about the config's fields.
+여기서는 우리 `surface`에 대한 구성을 정의하고 있습니다. 이는 `surface`가 내부의 `SurfaceTexture`를 어떻게 생성할지 정의합니다. `SurfaceTexture`에 대해서는 `render` 함수에서 다룰 것입니다. 지금은 `config`의 필드에 대해 이야기해 봅시다.
 
-The `usage` field describes how `SurfaceTexture`s will be used. `RENDER_ATTACHMENT` specifies that the textures will be used to write to the screen (we'll talk about more `TextureUsages`s later).
+`usage` 필드는 `SurfaceTexture`가 어떻게 사용될지를 설명합니다. `RENDER_ATTACHMENT`는 화면에 쓰기 위해 텍스처를 사용한다는 것을 명시합니다 (더 많은 `TextureUsages`에 대해서는 나중에 다룰 것입니다).
 
-The `format` defines how `SurfaceTexture`s will be stored on the GPU. We can get a supported format from the `SurfaceCapabilities`.
+`format`은 `SurfaceTexture`가 GPU에 어떻게 저장될지를 정의합니다. `SurfaceCapabilities`에서 지원되는 포맷을 얻을 수 있습니다.
 
-`width` and `height` are the width and the height in pixels of a `SurfaceTexture`. This should usually be the width and the height of the window.
+`width`와 `height`는 `SurfaceTexture`의 너비와 높이(픽셀 단위)입니다. 이것은 보통 창의 너비와 높이여야 합니다.
 
 <div class="warning">
 
-Make sure that the width and height of the `SurfaceTexture` are not 0, as that can cause your app to crash.
+`SurfaceTexture`의 너비와 높이가 0이 아닌지 확인하세요. 0이면 앱이 충돌할 수 있습니다.
 
 </div>
 
-`present_mode` uses `wgpu::PresentMode` enum, which determines how to sync the surface with the display. For the sake of simplicity, we select the first available option. If you do not want runtime selection, `PresentMode::Fifo` will cap the display rate at the display's framerate. This is essentially VSync. This mode is guaranteed to be supported on all platforms. There are other options, and you can see all of them [in the docs](https://docs.rs/wgpu/latest/wgpu/enum.PresentMode.html)
+`present_mode`는 `wgpu::PresentMode` 열거형을 사용하며, 이는 표면을 디스플레이와 동기화하는 방법을 결정합니다. 단순화를 위해 사용 가능한 첫 번째 옵션을 선택합니다. 런타임 선택을 원하지 않는 경우, `PresentMode::Fifo`는 디스플레이의 프레임 속도로 디스플레이 속도를 제한합니다. 이것은 본질적으로 VSync입니다. 이 모드는 모든 플랫폼에서 지원이 보장됩니다. 다른 옵션들도 있으며, 모든 옵션은 [문서](https://docs.rs/wgpu/latest/wgpu/enum.PresentMode.html)에서 볼 수 있습니다.
 
 <div class="note">
 
-If you want to let your users pick what `PresentMode` they use, you can use [SurfaceCapabilities::present_modes](https://docs.rs/wgpu/latest/wgpu/struct.SurfaceCapabilities.html#structfield.present_modes) to get a list of all the `PresentMode`s the surface supports:
+사용자가 사용할 `PresentMode`를 선택하게 하려면 [SurfaceCapabilities::present_modes](https://docs.rs/wgpu/latest/wgpu/struct.SurfaceCapabilities.html#structfield.present_modes)를 사용하여 surface가 지원하는 모든 `PresentMode` 목록을 얻을 수 있습니다:
 
 ```rust
 let modes = &surface_caps.present_modes;
 ```
 
-Regardless, `PresentMode::Fifo` will always be supported, and `PresentMode::AutoVsync` and `PresentMode::AutoNoVsync` have fallback support and therefore will work on all platforms.
+어떤 경우든 `PresentMode::Fifo`는 항상 지원되며, `PresentMode::AutoVsync`와 `PresentMode::AutoNoVsync`는 폴백 지원이 있어 모든 플랫폼에서 작동합니다.
 
 </div>
 
-`alpha_mode` is honestly not something I'm familiar with. I believe it has something to do with transparent windows, but feel free to open a pull request. For now, we'll just use the first `AlphaMode` in the list given by `surface_caps`.
+솔직히 `alpha_mode`는 저도 익숙하지 않은 부분입니다. 투명한 창과 관련이 있는 것 같지만, 언제든지 풀 리퀘스트를 열어주세요. 지금은 `surface_caps`가 제공하는 목록의 첫 번째 `AlphaMode`를 사용하겠습니다.
 
-`view_formats` is a list of `TextureFormat`s that you can use when creating `TextureView`s (we'll cover those briefly later in this tutorial as well as more in depth [in the texture tutorial](../tutorial5-textures)). As of writing, this means that if your surface is sRGB color space, you can create a texture view that uses a linear color space.
+`view_formats`는 `TextureView`를 생성할 때 사용할 수 있는 `TextureFormat` 목록입니다 (이 튜토리얼 후반부에서 간단히 다루고 [텍스처 튜토리얼](../tutorial5-textures)에서 더 깊이 다룰 것입니다). 글을 쓰는 시점에서 이것은 surface가 sRGB 색 공간인 경우, 선형 색 공간을 사용하는 텍스처 뷰를 생성할 수 있다는 것을 의미합니다.
 
-Now that we've configured our surface properly, we can add these new fields at the end of the method. The `is_surface_configured` field will be used later.
+이제 surface를 올바르게 구성했으므로, 메서드 끝에 이 새로운 필드들을 추가할 수 있습니다. `is_surface_configured` 필드는 나중에 사용될 것입니다.
 
 ```rust
     async fn new(window: Arc<Window>) -> anyhow::Result<State> {
@@ -194,8 +192,7 @@ Now that we've configured our surface properly, we can add these new fields at t
             device,
             queue,
             config,
-            is_surface_configured: false,
-            is_surface_configured: false,
+            is_surface_configured: false, // 이 줄이 중복되었습니다. 하나는 삭제해야 합니다.
             window,
         })
     }
@@ -203,7 +200,7 @@ Now that we've configured our surface properly, we can add these new fields at t
 
 ## resize()
 
-If we want to support resizing in our application, we're going to need to reconfigure the `surface` every time the window's size changes. That's the reason we stored the physical `size` and the `config` used to configure the `surface`. With all of these, the resize method is very simple.
+애플리케이션에서 크기 조절을 지원하려면 창 크기가 변경될 때마다 `surface`를 재구성해야 합니다. 이것이 우리가 물리적 `size`와 `surface`를 구성하는 데 사용된 `config`를 저장한 이유입니다. 이 모든 것을 가지고 resize 메서드는 매우 간단합니다.
 
 ```rust
 // impl State
@@ -217,11 +214,11 @@ pub fn resize(&mut self, width: u32, height: u32) {
 }
 ```
 
-This is where we configure the `surface`. We need the surface to be configured before we can do anything with it. We set the `is_surface_configured` flag to true here and we'll check it in the `render()` function.
+여기서 `surface`를 구성합니다. `surface`를 사용하기 전에 구성해야 합니다. 여기서 `is_surface_configured` 플래그를 true로 설정하고 `render()` 함수에서 확인할 것입니다.
 
 ## handle_key()
 
-This is where we'll handle keyboard events. Currently just want to exit the app when the escape key is pressed. We'll do some other stuff later.
+여기서 키보드 이벤트를 처리할 것입니다. 현재는 Escape 키를 누르면 앱을 종료하기만 원합니다. 나중에 다른 작업을 추가할 것입니다.
 
 ```rust
 // impl State
@@ -233,7 +230,7 @@ fn handle_key(&self, event_loop: &ActiveEventLoop, code: KeyCode, is_pressed: bo
 }
 ```
 
-We'll need to call our new `handle_key()` function in the `window_event()` function in `App`.
+`App`의 `window_event()` 함수에서 새로운 `handle_key()` 함수를 호출해야 합니다.
 
 ```rust
 impl ApplicationHandler<State> for App {
@@ -269,19 +266,19 @@ impl ApplicationHandler<State> for App {
 
 ## update()
 
-We don't have anything to update yet, so leave the method empty.
+아직 업데이트할 것이 없으므로 메서드를 비워 둡니다.
 
 ```rust
 fn update(&mut self) {
-    // remove `todo!()`
+    // `todo!()` 제거
 }
 ```
 
-We'll add some code here later on to move around objects.
+나중에 객체를 움직이기 위해 여기에 코드를 추가할 것입니다.
 
 ## render()
 
-Here's where the magic happens. First, we need to get a frame to render to.
+마법이 일어나는 곳입니다. 먼저, 렌더링할 프레임을 가져와야 합니다.
 
 ```rust
 // impl State
@@ -289,7 +286,7 @@ Here's where the magic happens. First, we need to get a frame to render to.
 fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
     self.window.request_redraw();
 
-    // We can't render unless the surface is configured
+    // surface가 구성되지 않으면 렌더링할 수 없습니다.
     if !self.is_surface_configured {
         return Ok(());
     }
@@ -297,15 +294,15 @@ fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
     let output = self.surface.get_current_texture()?;
 ```
 
-The `get_current_texture` function will wait for the `surface` to provide a new `SurfaceTexture` that we will render to. We'll store this in `output` for later.
+`get_current_texture` 함수는 `surface`가 우리가 렌더링할 새로운 `SurfaceTexture`를 제공할 때까지 기다립니다. 이것을 나중을 위해 `output`에 저장할 것입니다.
 
 ```rust
     let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
 ```
 
-This line creates a `TextureView` with default settings. We need to do this because we want to control how the render code interacts with the texture.
+이 줄은 기본 설정으로 `TextureView`를 생성합니다. 렌더 코드가 텍스처와 상호 작용하는 방식을 제어하고 싶기 때문에 이 작업을 해야 합니다.
 
-We also need to create a `CommandEncoder` to create the actual commands to send to the GPU. Most modern graphics frameworks expect commands to be stored in a command buffer before being sent to the GPU. The `encoder` builds a command buffer that we can then send to the GPU.
+또한 GPU로 보낼 실제 명령을 생성하기 위해 `CommandEncoder`를 만들어야 합니다. 대부분의 최신 그래픽 프레임워크는 명령이 GPU로 전송되기 전에 커맨드 버퍼에 저장될 것을 기대합니다. `encoder`는 우리가 GPU로 보낼 수 있는 커맨드 버퍼를 빌드합니다.
 
 ```rust
     let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -313,7 +310,7 @@ We also need to create a `CommandEncoder` to create the actual commands to send 
     });
 ```
 
-Now we can get to clearing the screen (a long time coming). We need to use the `encoder` to create a `RenderPass`. The `RenderPass` has all the methods for the actual drawing. The code for creating a `RenderPass` is a bit nested, so I'll copy it all here before talking about its pieces.
+이제 화면을 지우는 작업(오래 기다렸습니다)을 할 수 있습니다. `encoder`를 사용하여 `RenderPass`를 만들어야 합니다. `RenderPass`는 실제 그리기를 위한 모든 메서드를 가지고 있습니다. `RenderPass`를 만드는 코드는 약간 중첩되어 있으므로, 그 부분에 대해 이야기하기 전에 전체 코드를 여기에 복사하겠습니다.
 
 ```rust
     {
@@ -338,7 +335,7 @@ Now we can get to clearing the screen (a long time coming). We need to use the `
         });
     }
 
-    // submit will accept anything that implements IntoIter
+    // submit은 IntoIter를 구현하는 모든 것을 허용합니다.
     self.queue.submit(std::iter::once(encoder.finish()));
     output.present();
 
@@ -346,11 +343,11 @@ Now we can get to clearing the screen (a long time coming). We need to use the `
 }
 ```
 
-First things first, let's talk about the extra block (`{}`) around `encoder.begin_render_pass(...)`. `begin_render_pass()` borrows `encoder` mutably (aka `&mut self`). We can't call `encoder.finish()` until we release that mutable borrow. The block tells Rust to drop any variables within it when the code leaves that scope, thus releasing the mutable borrow on `encoder` and allowing us to `finish()` it. If you don't like the `{}`, you can also use `drop(render_pass)` to achieve the same effect.
+먼저, `encoder.begin_render_pass(...)`를 감싸는 추가 블록(`{}`)에 대해 이야기해 봅시다. `begin_render_pass()`는 `encoder`를 가변적으로(mutably, 즉 `&mut self`) 빌려옵니다. 이 가변적인 빌림을 해제하기 전까지는 `encoder.finish()`를 호출할 수 없습니다. 이 블록은 Rust에게 해당 스코프를 벗어날 때 그 안의 모든 변수를 드롭(drop)하도록 지시하여, `encoder`에 대한 가변적인 빌림을 해제하고 `finish()`를 호출할 수 있게 해줍니다. `{}`가 마음에 들지 않으면 `drop(render_pass)`를 사용하여 동일한 효과를 얻을 수도 있습니다.
 
-The last lines of the code tell `wgpu` to finish the command buffer and submit it to the GPU's render queue.
+코드의 마지막 줄은 `wgpu`에게 커맨드 버퍼를 마무리하고 GPU의 렌더 큐에 제출하라고 지시합니다.
 
-We need to update the event loop again to call this method. We'll also call `update()` before it, too.
+이 메서드를 호출하기 위해 이벤트 루프를 다시 업데이트해야 합니다. 그 전에 `update()`도 호출할 것입니다.
 
 ```rust
 // run()
@@ -370,7 +367,7 @@ We need to update the event loop again to call this method. We'll also call `upd
             WindowEvent::RedrawRequested => {
                 match state.render() {
                     Ok(_) => {}
-                    // Reconfigure the surface if it's lost or outdated
+                    // surface가 손실되거나 오래된 경우 재구성합니다.
                     Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
                         let size = state.window.inner_size();
                         state.resize(size.width, size.height);
@@ -385,13 +382,13 @@ We need to update the event loop again to call this method. We'll also call `upd
     }
 ```
 
-With all that, you should be getting something that looks like this.
+이 모든 것을 마치면 다음과 같은 화면이 나타나야 합니다.
 
-![Window with a blue background](./cleared-window.png)
+![파란 배경의 창](./cleared-window.png)
 
-## Wait, what's going on with RenderPassDescriptor?
+## 잠깐, RenderPassDescriptor는 대체 무엇일까요?
 
-Some of you may be able to tell what's going on just by looking at it, but I'd be remiss if I didn't go over it. Let's take a look at the code again.
+여러분 중 일부는 보기만 해도 무슨 일인지 알 수 있겠지만, 제가 설명하지 않고 넘어가면 직무유기일 것입니다. 코드를 다시 한번 살펴봅시다.
 
 ```rust
 &wgpu::RenderPassDescriptor {
@@ -403,15 +400,15 @@ Some of you may be able to tell what's going on just by looking at it, but I'd b
 }
 ```
 
-A `RenderPassDescriptor` only has three fields: `label`, `color_attachments` and `depth_stencil_attachment`. The `color_attachments` describe where we are going to draw our color to. We use the `TextureView` we created earlier to make sure that we render to the screen.
+`RenderPassDescriptor`에는 `label`, `color_attachments`, `depth_stencil_attachment` 세 개의 필드만 있습니다. `color_attachments`는 우리가 색상을 그릴 위치를 설명합니다. 화면에 렌더링되도록 하기 위해 이전에 만든 `TextureView`를 사용합니다.
 
 <div class="note">
 
-The `color_attachments` field is a "sparse" array. This allows you to use a pipeline that expects multiple render targets and only supplies the ones you care about.
+`color_attachments` 필드는 "희소 배열(sparse array)"입니다. 이를 통해 여러 렌더 타겟을 예상하는 파이프라인을 사용하면서 신경 쓰는 타겟만 제공할 수 있습니다.
 
 </div>
 
-We'll use `depth_stencil_attachment` later, but we'll set it to `None` for now.
+`depth_stencil_attachment`는 나중에 사용하겠지만, 지금은 `None`으로 설정합니다.
 
 ```rust
 Some(wgpu::RenderPassColorAttachment {
@@ -429,30 +426,30 @@ Some(wgpu::RenderPassColorAttachment {
 })
 ```
 
-The `RenderPassColorAttachment` has the `view` field, which informs `wgpu` what texture to save the colors to. In this case, we specify the `view` that we created using `surface.get_current_texture()`. This means that any colors we draw to this attachment will get drawn to the screen.
+`RenderPassColorAttachment`에는 `view` 필드가 있으며, 이는 `wgpu`에게 색상을 저장할 텍스처를 알려줍니다. 이 경우, `surface.get_current_texture()`를 사용하여 만든 `view`를 지정합니다. 이것은 이 어태치먼트에 그리는 모든 색상이 화면에 그려진다는 것을 의미합니다.
 
-The `resolve_target` is the texture that will receive the resolved output. This will be the same as `view` unless multisampling is enabled. We don't need to specify this, so we leave it as `None`.
+`resolve_target`은 해석된(resolved) 출력을 받을 텍스처입니다. 멀티샘플링이 활성화되지 않은 경우 `view`와 동일합니다. 이것을 지정할 필요가 없으므로 `None`으로 둡니다.
 
-The `ops` field takes a `wgpu::Operations` object. This tells wgpu what to do with the colors on the screen (specified by `view`). The `load` field tells wgpu how to handle colors stored from the previous frame. Currently, we are clearing the screen with a bluish color. The `store` field tells wgpu whether we want to store the rendered results to the `Texture` behind our `TextureView` (in this case, it's the `SurfaceTexture`). We use `StoreOp::Store` as we do want to store our render results.
+`ops` 필드는 `wgpu::Operations` 객체를 받습니다. 이것은 wgpu에게 화면의 색상(`view`로 지정됨)으로 무엇을 할지 지시합니다. `load` 필드는 이전 프레임에서 저장된 색상을 어떻게 처리할지 wgpu에 지시합니다. 현재는 화면을 푸른색 계열의 색상으로 지우고 있습니다. `store` 필드는 렌더링된 결과를 `TextureView` 뒤의 `Texture`에 저장할지 여부를 wgpu에 지시합니다 (이 경우, `SurfaceTexture`입니다). 렌더링 결과를 저장하고 싶으므로 `StoreOp::Store`를 사용합니다.
 
 <div class="note">
 
-It's not uncommon to not clear the screen if the screen is going to be completely covered up with objects. If your scene doesn't cover the entire screen, however, you can end up with something like this.
+화면이 객체들로 완전히 덮일 예정이라면 화면을 지우지 않는 것이 드물지 않습니다. 그러나 씬(scene)이 화면 전체를 덮지 않는다면, 다음과 같은 결과가 나올 수 있습니다.
 
 ![./no-clear.png](./no-clear.png)
 
 </div>
 
-## Validation Errors?
+## 유효성 검사 오류(Validation Errors)?
 
-If wgpu is using Vulkan on your machine, you may run into validation errors if you are running an older version of the Vulkan SDK. You should be using at least version `1.2.182` as older versions can give out some false positives. If errors persist, you may have encountered a bug in wgpu. You can post an issue at [https://github.com/gfx-rs/wgpu](https://github.com/gfx-rs/wgpu)
+머신에서 wgpu가 Vulkan을 사용하고 있다면, 오래된 버전의 Vulkan SDK를 실행 중일 경우 유효성 검사 오류가 발생할 수 있습니다. 최소 `1.2.182` 버전 이상을 사용해야 합니다. 이전 버전은 일부 거짓 양성(false positives)을 일으킬 수 있습니다. 오류가 계속되면 wgpu에 버그가 있을 수 있습니다. [https://github.com/gfx-rs/wgpu](https://github.com/gfx-rs/wgpu)에 이슈를 게시할 수 있습니다.
 
-## Demo
+## 데모
 
 <WasmExample example="tutorial2_surface"></WasmExample>
 
 <AutoGithubLink/>
 
-## Challenge
+## 도전 과제
 
-Modify the `input()` method to capture mouse events, and update the clear color using that. *Hint: you'll probably need to use `WindowEvent::CursorMoved`*.
+마우스 이벤트를 캡처하고 그것을 사용하여 배경색(clear color)을 업데이트하도록 `input()` 메서드를 수정하세요. *힌트: 아마도 `WindowEvent::CursorMoved`를 사용해야 할 것입니다*.

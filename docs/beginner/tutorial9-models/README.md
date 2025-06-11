@@ -1,8 +1,8 @@
-# Model Loading
+# 모델 로딩
 
-Up to this point, we've been creating our models manually. While this is an acceptable way to do this, it's really slow if we want to include complex models with lots of polygons. Because of this, we're going to modify our code to leverage the `.obj` model format so that we can create a model in software such as Blender and display it in our code.
+지금까지 우리는 모델을 수동으로 만들어왔습니다. 이 방법도 괜찮지만, 폴리곤이 많은 복잡한 모델을 포함시키고 싶을 때는 정말 느립니다. 이러한 이유로, 이제 코드를 수정하여 `.obj` 모델 형식을 활용함으로써 Blender와 같은 소프트웨어에서 모델을 만들어 코드에 표시할 수 있도록 할 것입니다.
 
-Our `lib.rs` file is getting pretty cluttered. Let's create a `model.rs` file into which we can put our model loading code.
+`lib.rs` 파일이 꽤 복잡해지고 있습니다. 모델 로딩 코드를 넣을 수 있도록 `model.rs` 파일을 만들어 보겠습니다.
 
 ```rust
 // model.rs
@@ -25,11 +25,11 @@ impl Vertex for ModelVertex {
 }
 ```
 
-You'll notice a couple of things here. In `lib.rs`, we had `Vertex` as a struct, but here we're using a trait. We could have multiple vertex types (model, UI, instance data, etc.). Making `Vertex` a trait will allow us to abstract out the `VertexBufferLayout` creation code to make creating `RenderPipeline`s simpler.
+여기서 몇 가지를 발견할 수 있습니다. `lib.rs`에서는 `Vertex`를 구조체(struct)로 사용했지만, 여기서는 트레이트(trait)를 사용하고 있습니다. 우리는 여러 버텍스 타입(모델, UI, 인스턴스 데이터 등)을 가질 수 있습니다. `Vertex`를 트레이트로 만들면 `VertexBufferLayout` 생성 코드를 추상화하여 `RenderPipeline`을 더 간단하게 만들 수 있습니다.
 
-Another thing to mention is the `normal` field in `ModelVertex`. We won't use this until we talk about lighting, but will add it to the struct for now.
+또 다른 점은 `ModelVertex`의 `normal` 필드입니다. 이 필드는 조명에 대해 이야기할 때까지 사용하지 않겠지만, 지금은 구조체에 추가해 두겠습니다.
 
-Let's define our `VertexBufferLayout`.
+이제 `VertexBufferLayout`을 정의해 봅시다.
 
 ```rust
 impl Vertex for ModelVertex {
@@ -60,9 +60,9 @@ impl Vertex for ModelVertex {
 }
 ```
 
-This is basically the same as the original `VertexBufferLayout`, but we added a `VertexAttribute` for the `normal`. Remove the `Vertex` struct in `lib.rs` as we won't need it anymore, and use our new `Vertex` from `model` for the `RenderPipeline`.
+이 코드는 기본적으로 원래의 `VertexBufferLayout`과 동일하지만, `normal`을 위한 `VertexAttribute`를 추가했습니다. `lib.rs`에 있던 `Vertex` 구조체는 더 이상 필요 없으므로 삭제하고, `RenderPipeline`을 위해 `model`의 새로운 `Vertex`를 사용하세요.
 
-We will also remove our homemade `vertex_buffer`, `index_buffer` and `num_indices`.
+또한, 직접 만들었던 `vertex_buffer`, `index_buffer`, `num_indices`도 제거할 것입니다.
 
 ```rust
 let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -75,19 +75,19 @@ let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescrip
 });
 ```
 
-Since the `desc` method is implemented on the `Vertex` trait, the trait needs to be imported before the method will be accessible. Put the import towards the top of the file with the others.
+`desc` 메서드는 `Vertex` 트레이트에 구현되어 있으므로, 이 메서드에 접근하려면 먼저 트레이트를 가져와야(import) 합니다. 파일 상단의 다른 `use`문과 함께 추가해주세요.
 
 ```rust
 use model::Vertex;
 ```
 
-With all that in place, we need a model to render. If you have one already, that's great, but I've supplied a [zip file](https://github.com/sotrh/learn-wgpu/blob/master/code/beginner/tutorial9-models/res/cube.zip) with the model and all of its textures. We're going to put this model in a new `res` folder next to the existing `src` folder.
+이 모든 것이 준비되었으니, 이제 렌더링할 모델이 필요합니다. 이미 가지고 있다면 좋지만, 없다면 모델과 모든 텍스처가 포함된 [zip 파일](https://github.com/sotrh/learn-wgpu/blob/master/code/beginner/tutorial9-models/res/cube.zip)을 제공해 드립니다. 이 모델을 기존 `src` 폴더 옆에 새로운 `res` 폴더를 만들어 그 안에 넣을 것입니다.
 
-## Accessing files in the res folder
+## res 폴더의 파일에 접근하기
 
-When Cargo builds and runs our program, it sets what's known as the current working directory. This directory usually contains your project's root `Cargo.toml`. The path to our res folder may differ depending on the project's structure. In the `res` folder, the example code for this section tutorial is at `code/beginner/tutorial9-models/res/`. When loading our model, we could use this path and just append `cube.obj`. This is fine, but if we change our project's structure, our code will break.
+Cargo가 우리 프로그램을 빌드하고 실행할 때, 현재 작업 디렉토리(current working directory)라는 것을 설정합니다. 이 디렉토리에는 보통 프로젝트의 루트 `Cargo.toml`이 포함됩니다. `res` 폴더의 경로는 프로젝트 구조에 따라 달라질 수 있습니다. 이 튜토리얼의 예제 코드에서 `res` 폴더는 `code/beginner/tutorial9-models/res/`에 있습니다. 모델을 로드할 때 이 경로를 사용하고 `cube.obj`를 덧붙일 수 있습니다. 이것도 괜찮지만, 프로젝트 구조를 변경하면 코드가 깨질 것입니다.
 
-We're going to fix that by modifying our build script to copy our `res` folder to where Cargo creates our executable, and we'll reference it from there. Create a file called `build.rs` and add the following:
+이 문제를 해결하기 위해, 빌드 스크립트를 수정하여 Cargo가 실행 파일을 만드는 위치에 `res` 폴더를 복사하고, 거기서부터 참조하도록 할 것입니다. `build.rs`라는 파일을 만들고 다음을 추가하세요.
 
 ```rust
 use anyhow::*;
@@ -96,7 +96,7 @@ use fs_extra::dir::CopyOptions;
 use std::env;
 
 fn main() -> Result<()> {
-    // This tells Cargo to rerun this script if something in /res/ changes.
+    // 이 줄은 /res/ 폴더에 변경 사항이 있을 경우 Cargo에게 이 스크립트를 다시 실행하라고 알립니다.
     println!("cargo:rerun-if-changed=res/*");
 
     let out_dir = env::var("OUT_DIR")?;
@@ -112,17 +112,17 @@ fn main() -> Result<()> {
 
 <div class="note">
 
-Make sure to put `build.rs` in the same folder as the `Cargo.toml`. If you don't, Cargo won't run it when your crate builds.
+`build.rs`를 `Cargo.toml`과 같은 폴더에 두어야 합니다. 그렇지 않으면 Cargo가 크레이트를 빌드할 때 실행하지 않습니다.
 
 </div>
 
 <div class="note">
 
-The `OUT_DIR` is an environment variable that Cargo uses to specify where our application will be built.
+`OUT_DIR`은 Cargo가 애플리케이션이 빌드될 위치를 지정하는 데 사용하는 환경 변수입니다.
 
 </div>
 
-You'll need to modify your `Cargo.toml` for this to work properly. Add the following below your `[dependencies]` block.
+이것이 제대로 작동하려면 `Cargo.toml`을 수정해야 합니다. `[dependencies]` 블록 아래에 다음을 추가하세요.
 
 ```toml
 [build-dependencies]
@@ -131,9 +131,9 @@ fs_extra = "1.2"
 glob = "0.3"
 ```
 
-## Accessing files from WASM
+## WASM에서 파일에 접근하기
 
-By design, you can't access files on a user's filesystem in Web Assembly. Instead, we'll serve those files up using a web serve and then load those files into our code using an http request. In order to simplify this, let's create a file called `resources.rs` to handle this for us. We'll create two functions that load text and binary files, respectively.
+설계상, 웹 어셈블리(Web Assembly)에서는 사용자 파일 시스템의 파일에 접근할 수 없습니다. 대신, 웹 서버를 사용해 해당 파일들을 제공하고 HTTP 요청을 통해 코드 안으로 로드할 것입니다. 이를 단순화하기 위해, 이 작업을 처리할 `resources.rs`라는 파일을 만들어 봅시다. 각각 텍스트 파일과 바이너리 파일을 로드하는 두 개의 함수를 만들 것입니다.
 
 ```rust
 use std::io::{BufReader, Cursor};
@@ -191,19 +191,19 @@ pub async fn load_binary(file_name: &str) -> anyhow::Result<Vec<u8>> {
 
 <div class="note">
 
-We're using `OUT_DIR` on desktop to access our `res` folder.
+데스크톱에서는 `OUT_DIR`을 사용하여 `res` 폴더에 접근하고 있습니다.
 
 </div>
 
-I'm using [reqwest](https://docs.rs/reqwest) to handle loading the requests when using WASM. Add the following to the `Cargo.toml`:
+WASM 사용 시 요청을 처리하기 위해 [reqwest](https://docs.rs/reqwest)를 사용하고 있습니다. `Cargo.toml`에 다음을 추가하세요:
 
 ```toml
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-# Other dependencies
+# 다른 의존성들
 reqwest = { version = "0.11" }
 ```
 
-We'll also need to add the `Location` feature to `web-sys`:
+또한 `web-sys`에 `Location` 기능을 추가해야 합니다:
 
 ```toml
 web-sys = { version = "0.3", features = [
@@ -214,23 +214,23 @@ web-sys = { version = "0.3", features = [
 ]}
 ```
 
-Make sure to add `resources` as a module in `lib.rs`:
+`lib.rs`에 `resources`를 모듈로 추가하는 것을 잊지 마세요:
 
 ```rust
 mod resources;
 ```
 
-## Loading models with TOBJ
+## TOBJ로 모델 로딩하기
 
-We're going to use the [tobj](https://docs.rs/tobj/3.0/tobj/) library to load our model. Let's add it to our `Cargo.toml`.
+[tobj](https://docs.rs/tobj/3.0/tobj/) 라이브러리를 사용하여 모델을 로드할 것입니다. `Cargo.toml`에 추가해 봅시다.
 
 ```toml
 [dependencies]
-# other dependencies...
+# 다른 의존성들...
 tobj = { version = "3.2", default-features = false, features = ["async"]}
 ```
 
-Before we can load our model, though, we need somewhere to put it.
+하지만 모델을 로드하기 전에, 그것을 담을 공간이 필요합니다.
 
 ```rust
 // model.rs
@@ -240,7 +240,7 @@ pub struct Model {
 }
 ```
 
-You'll notice that our `Model` struct has a `Vec` for the `meshes` and `materials`. This is important as our obj file can include multiple meshes and materials. We still need to create the `Mesh` and `Material` classes, so let's do that.
+`Model` 구조체에는 `meshes`와 `materials`를 위한 `Vec`이 있습니다. 이는 `.obj` 파일이 여러 메쉬와 머티리얼을 포함할 수 있기 때문에 중요합니다. 아직 `Mesh`와 `Material` 클래스를 만들어야 하므로, 이제 그것들을 만들어 봅시다.
 
 ```rust
 pub struct Material {
@@ -258,12 +258,11 @@ pub struct Mesh {
 }
 ```
 
-The `Material` is pretty simple. It's just the name and one texture. Our cube obj actually has two textures, but one is a normal map, and we'll get to those [later](../../intermediate/tutorial11-normals). The name is more for debugging purposes.
+`Material`은 꽤 간단합니다. 이름과 하나의 텍스처로 이루어져 있습니다. 우리의 큐브 obj는 실제로 두 개의 텍스처를 가지고 있지만, 하나는 노멀 맵이며, 그것은 [나중에](../../intermediate/tutorial11-normals) 다룰 것입니다. 이름은 주로 디버깅 목적으로 사용됩니다.
 
-Speaking of textures, we'll need to add a function to load a `Texture` in `resources.rs`.
+텍스처 이야기가 나왔으니, `resources.rs`에 `Texture`를 로드하는 함수를 추가해야 합니다.
 
 ```rust
-
 pub async fn load_texture(
     file_name: &str,
     device: &wgpu::Device,
@@ -274,20 +273,22 @@ pub async fn load_texture(
 }
 ```
 
-The `load_texture` method will be useful when we load the textures for our models, as `include_bytes!` requires that we know the name of the file at compile time, which we can't really guarantee with model textures.
+`load_texture` 메서드는 모델의 텍스처를 로드할 때 유용할 것입니다. `include_bytes!`는 컴파일 타임에 파일 이름을 알아야 하는데, 모델 텍스처의 경우 이를 보장할 수 없기 때문입니다.
 
-`Mesh` holds a vertex buffer, an index buffer, and the number of indices in the mesh. We're using an `usize` for the material. This `usize` will index the `materials` list when it comes time to draw.
+`Mesh`는 버텍스 버퍼, 인덱스 버퍼, 그리고 메쉬의 인덱스 수를 가지고 있습니다. 머티리얼에는 `usize`를 사용합니다. 이 `usize`는 그릴 때가 되면 `materials` 리스트의 인덱스로 사용될 것입니다.
 
-With all that out of the way, we can get to loading our model.
+이제 모든 준비가 끝났으니, 모델을 로드해 봅시다.
 
 ```rust
+use std::io::{BufReader, Cursor};
+
 pub async fn load_model(
     file_name: &str,
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     layout: &wgpu::BindGroupLayout,
 ) -> anyhow::Result<model::Model> {
-    let obj_text = load_string(file_name).await?;
+    let obj_text = crate::resources::load_string(file_name).await?;
     let obj_cursor = Cursor::new(obj_text);
     let mut obj_reader = BufReader::new(obj_cursor);
 
@@ -299,7 +300,7 @@ pub async fn load_model(
             ..Default::default()
         },
         |p| async move {
-            let mat_text = load_string(&p).await.unwrap();
+            let mat_text = crate::resources::load_string(&p).await.unwrap();
             tobj::load_mtl_buf(&mut BufReader::new(Cursor::new(mat_text)))
         },
     )
@@ -307,7 +308,8 @@ pub async fn load_model(
 
     let mut materials = Vec::new();
     for m in obj_materials? {
-        let diffuse_texture = load_texture(&m.diffuse_texture, device, queue).await?;
+        let diffuse_texture =
+            crate::resources::load_texture(&m.diffuse_texture.unwrap(), device, queue).await?;
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout,
             entries: &[
@@ -333,32 +335,20 @@ pub async fn load_model(
     let meshes = models
         .into_iter()
         .map(|m| {
-                let vertices = (0..m.mesh.positions.len() / 3)
+            let vertices = (0..m.mesh.positions.len() / 3)
                 .map(|i| {
-                    if m.mesh.normals.is_empty(){
-                        model::ModelVertex {
-                            position: [
-                                m.mesh.positions[i * 3],
-                                m.mesh.positions[i * 3 + 1],
-                                m.mesh.positions[i * 3 + 2],
-                            ],
-                            tex_coords: [m.mesh.texcoords[i * 2], 1.0 - m.mesh.texcoords[i * 2 + 1]],
-                            normal: [0.0, 0.0, 0.0],
-                        }
-                    }else{
-                        model::ModelVertex {
-                            position: [
-                                m.mesh.positions[i * 3],
-                                m.mesh.positions[i * 3 + 1],
-                                m.mesh.positions[i * 3 + 2],
-                            ],
-                            tex_coords: [m.mesh.texcoords[i * 2], 1.0 - m.mesh.texcoords[i * 2 + 1]],
-                            normal: [
-                                m.mesh.normals[i * 3],
-                                m.mesh.normals[i * 3 + 1],
-                                m.mesh.normals[i * 3 + 2],
-                            ],
-                        }
+                    model::ModelVertex {
+                        position: [
+                            m.mesh.positions[i * 3],
+                            m.mesh.positions[i * 3 + 1],
+                            m.mesh.positions[i * 3 + 2],
+                        ],
+                        tex_coords: [m.mesh.texcoords[i * 2], 1.0 - m.mesh.texcoords[i * 2 + 1]],
+                        normal: [
+                            m.mesh.normals[i * 3],
+                            m.mesh.normals[i * 3 + 1],
+                            m.mesh.normals[i * 3 + 2],
+                        ],
                     }
                 })
                 .collect::<Vec<_>>();
@@ -386,15 +376,54 @@ pub async fn load_model(
 
     Ok(model::Model { meshes, materials })
 }
-
 ```
 
-## Rendering a mesh
+*역자 주: 위 코드에서 `m.diffuse_texture`는 `Option<String>` 타입일 수 있으므로 `.unwrap()`을 추가해야 할 수 있습니다. 또한 `m.mesh.normals`가 비어있을 경우를 대비하여 `if/else` 분기를 추가하는 것이 안전합니다.*
 
-Before we can draw the model, we need to be able to draw an individual mesh. Let's create a trait called `DrawModel` and implement it for `RenderPass`.
+```rust
+// 수정 제안
+let vertices = (0..m.mesh.positions.len() / 3)
+    .map(|i| {
+        if m.mesh.normals.is_empty() {
+            model::ModelVertex {
+                position: [
+                    m.mesh.positions[i * 3],
+                    m.mesh.positions[i * 3 + 1],
+                    m.mesh.positions[i * 3 + 2],
+                ],
+                tex_coords: [m.mesh.texcoords[i * 2], 1.0 - m.mesh.texcoords[i * 2 + 1]],
+                normal: [0.0, 0.0, 0.0],
+            }
+        } else {
+            model::ModelVertex {
+                position: [
+                    m.mesh.positions[i * 3],
+                    m.mesh.positions[i * 3 + 1],
+                    m.mesh.positions[i * 3 + 2],
+                ],
+                tex_coords: [m.mesh.texcoords[i * 2], 1.0 - m.mesh.texcoords[i * 2 + 1]],
+                normal: [
+                    m.mesh.normals[i * 3],
+                    m.mesh.normals[i * 3 + 1],
+                    m.mesh.normals[i * 3 + 2],
+                ],
+            }
+        }
+    })
+    .collect::<Vec<_>>();
+```
+
+
+## 메쉬 렌더링하기
+
+모델을 그리기 전에, 개별 메쉬를 그릴 수 있어야 합니다. `DrawModel`이라는 트레이트를 만들고 `RenderPass`에 대해 구현해 봅시다.
 
 ```rust
 // model.rs
+use std::ops::Range;
+
+//... 다른 struct 정의들
+
 pub trait DrawModel<'a> {
     fn draw_mesh(&mut self, mesh: &'a Mesh);
     fn draw_mesh_instanced(
@@ -423,9 +452,9 @@ where
 }
 ```
 
-We could have put these methods in an `impl Model`, but I felt it made more sense to have the `RenderPass` do all the rendering, as that's kind of its job. This does mean we have to import `DrawModel` when we go to render, though.
+이 메서드들을 `impl Model`에 넣을 수도 있었지만, 렌더링이 `RenderPass`의 역할이므로, `RenderPass`가 모든 렌더링을 수행하는 것이 더 합리적이라고 생각했습니다. 하지만 이것은 렌더링할 때 `DrawModel`을 가져와야 한다는 것을 의미합니다.
 
-When we removed `vertex_buffer`, etc., we also removed their render_pass setup.
+`vertex_buffer` 등을 제거했을 때, `render_pass` 설정도 함께 제거했습니다.
 
 ```rust
 // lib.rs
@@ -438,7 +467,7 @@ use model::DrawModel;
 render_pass.draw_mesh_instanced(&self.obj_model.meshes[0], 0..self.instances.len() as u32);
 ```
 
-Before that, though, we need to load the model and save it to `State`. Put the following in `State::new()`.
+하지만 그 전에, 모델을 로드하고 `State`에 저장해야 합니다. `State::new()`에 다음을 넣으세요.
 
 ```rust
 let obj_model =
@@ -447,7 +476,7 @@ let obj_model =
         .unwrap();
 ```
 
-Our new model is a bit bigger than our previous one, so we're gonna need to adjust the spacing on our instances a bit.
+새 모델은 이전 모델보다 약간 크므로 인스턴스 간의 간격을 조정해야 합니다.
 
 ```rust
 const SPACE_BETWEEN: f32 = 3.0;
@@ -471,21 +500,21 @@ let instances = (0..NUM_INSTANCES_PER_ROW).flat_map(|z| {
 }).collect::<Vec<_>>();
 ```
 
-With all that done, you should get something like this.
+이 모든 작업을 마치면 다음과 같은 결과물을 얻게 됩니다.
 
 ![cubes.png](./cubes.png)
 
-## Using the correct textures
+## 올바른 텍스처 사용하기
 
-If you look at the texture files for our obj, you'll see that they don't match up to our obj. The texture we want to see is this one,
+obj의 텍스처 파일을 보면, 우리 obj와 일치하지 않는다는 것을 알 수 있습니다. 우리가 보고 싶은 텍스처는 이것입니다.
 
 ![cube-diffuse.jpg](./cube-diffuse.jpg)
 
-but we're still getting our happy tree texture.
+하지만 우리는 여전히 행복한 나무 텍스처를 보고 있습니다.
 
-The reason for this is quite simple. Though we've created our textures, we haven't created a bind group to give to the `RenderPass`. We're still using our old `diffuse_bind_group`. If we want to change that, we need to use the bind group from our materials - the `bind_group` member of the `Material` struct.
+그 이유는 매우 간단합니다. 텍스처는 만들었지만, `RenderPass`에 전달할 바인드 그룹을 만들지 않았기 때문입니다. 우리는 여전히 오래된 `diffuse_bind_group`을 사용하고 있습니다. 이를 변경하려면, 우리 머티리얼의 바인드 그룹, 즉 `Material` 구조체의 `bind_group` 멤버를 사용해야 합니다.
 
-We're going to add a material parameter to `DrawModel`.
+`DrawModel`에 머티리얼 파라미터를 추가할 것입니다.
 
 ```rust
 pub trait DrawModel<'a> {
@@ -497,7 +526,6 @@ pub trait DrawModel<'a> {
         instances: Range<u32>,
         camera_bind_group: &'a wgpu::BindGroup,
     );
-
 }
 
 impl<'a, 'b> DrawModel<'b> for wgpu::RenderPass<'a>
@@ -524,7 +552,7 @@ where
 }
 ```
 
-We need to change the render code to reflect this.
+이를 반영하여 렌더링 코드를 변경해야 합니다.
 
 ```rust
 render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
@@ -536,13 +564,13 @@ let material = &self.obj_model.materials[mesh.material];
 render_pass.draw_mesh_instanced(mesh, material, 0..self.instances.len() as u32, &self.camera_bind_group);
 ```
 
-With all that in place, we should get the following.
+이 모든 것을 적용하면 다음과 같은 결과를 얻을 수 있습니다.
 
 ![cubes-correct.png](./cubes-correct.png)
 
-## Rendering the entire model
+## 전체 모델 렌더링하기
 
-Right now, we are specifying the mesh and the material directly. This is useful if we want to draw a mesh with a different material. We're also not rendering other parts of the model (if we had some). Let's create a method for `DrawModel` that will draw all the parts of the model with their respective materials.
+현재 우리는 메쉬와 머티리얼을 직접 지정하고 있습니다. 이것은 다른 머티리얼로 메쉬를 그리고 싶을 때 유용합니다. 또한 모델의 다른 부분(만약 있다면)은 렌더링하고 있지 않습니다. 이제 `DrawModel`에 모델의 모든 부분을 각자의 머티리얼로 그리는 메서드를 만들어 봅시다.
 
 ```rust
 pub trait DrawModel<'a> {
@@ -578,7 +606,7 @@ where
 }
 ```
 
-The code in `lib.rs` will change accordingly.
+`lib.rs`의 코드도 그에 맞게 변경될 것입니다.
 
 ```rust
 render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
@@ -586,7 +614,7 @@ render_pass.set_pipeline(&self.render_pipeline);
 render_pass.draw_model_instanced(&self.obj_model, 0..self.instances.len() as u32, &self.camera_bind_group);
 ```
 
-## Demo
+## 데모
 
 <WasmExample example="tutorial9_models"></WasmExample>
 

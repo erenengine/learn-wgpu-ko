@@ -1,16 +1,16 @@
-# Textures and bind groups
+# 텍스처와 바인드 그룹
 
-Up to this point, we have been drawing super simple shapes. While we can make a game with just triangles, trying to draw highly detailed objects would massively limit what devices could even run our game. However, we can get around this problem with **textures**.
+지금까지 우리는 매우 간단한 모양만 그려왔습니다. 삼각형만으로 게임을 만들 수도 있지만, 매우 상세한 객체를 그리려고 하면 게임을 실행할 수 있는 기기가 크게 제한될 것입니다. 하지만 **텍스처(textures)**를 사용하면 이 문제를 해결할 수 있습니다.
 
-Textures are images overlaid on a triangle mesh to make it seem more detailed. There are multiple types of textures, such as normal maps, bump maps, specular maps, and diffuse maps. We're going to talk about diffuse maps or, more simply, the color texture.
+텍스처는 삼각형 메시에 겹쳐 씌워 더 상세하게 보이도록 만드는 이미지입니다. 노멀 맵, 범프 맵, 스페큘러 맵, 디퓨즈 맵 등 여러 종류의 텍스처가 있습니다. 우리는 여기서 디퓨즈 맵, 또는 더 간단하게는 색상 텍스처에 대해 이야기할 것입니다.
 
-## Loading an image from a file
+## 파일에서 이미지 불러오기
 
-If we want to map an image to our mesh, we first need an image. Let's use this happy little tree:
+메시에 이미지를 매핑하려면 먼저 이미지가 필요합니다. 이 행복한 작은 나무를 사용해 봅시다:
 
 ![a happy tree](./happy-tree.png)
 
-We'll use the [image crate](https://docs.rs/image) to load our tree. Let's add it to our dependencies:
+[image 크레이트](https://docs.rs/image)를 사용하여 나무 이미지를 불러올 것입니다. 의존성에 추가해 봅시다:
 
 ```toml
 [dependencies.image]
@@ -19,15 +19,15 @@ default-features = false
 features = ["png", "jpeg"]
 ```
 
-The jpeg decoder that `image` includes uses [rayon](https://docs.rs/rayon) to speed up the decoding with threads. WASM doesn't support threads currently, so we need to disable this so our code won't crash when we try to load a jpeg on the web.
+`image`에 포함된 jpeg 디코더는 [rayon](https://docs.rs/rayon)을 사용하여 스레드로 디코딩 속도를 높입니다. WASM은 현재 스레드를 지원하지 않으므로, 웹에서 jpeg를 불러올 때 코드가 충돌하지 않도록 이 기능을 비활성화해야 합니다.
 
 <div class="note">
 
-Decoding jpegs in WASM isn't very performant. If you want to speed up image loading in general in WASM, you could opt to use the browser's built-in decoders instead of `image` when building with `wasm-bindgen`. This will involve creating an `<img>` tag in Rust to get the image and then a `<canvas>` to get the pixel data, but I'll leave this as an exercise for the reader.
+WASM에서 jpeg를 디코딩하는 것은 성능이 좋지 않습니다. WASM에서 전반적인 이미지 로딩 속도를 높이고 싶다면, `wasm-bindgen`으로 빌드할 때 `image` 대신 브라우저의 내장 디코더를 사용하도록 선택할 수 있습니다. 이를 위해서는 Rust에서 `<img>` 태그를 만들어 이미지를 가져오고, `<canvas>`를 만들어 픽셀 데이터를 얻어야 하지만, 이는 독자 여러분을 위한 연습 문제로 남겨두겠습니다.
 
 </div>
 
-In `State`'s `new()` method, add the following just after declaring the `config`:
+`State`의 `new()` 메서드에서 `config`를 선언한 직후에 다음 코드를 추가하세요:
 
 ```rust
 let config = wgpu::SurfaceConfiguration {
@@ -40,7 +40,7 @@ let config = wgpu::SurfaceConfiguration {
     view_formats: vec![],
     desired_maximum_frame_latency: 2,
 };
-// NEW!
+// 새로운 코드!
 
 let diffuse_bytes = include_bytes!("happy-tree.png");
 let diffuse_image = image::load_from_memory(diffuse_bytes).unwrap();
@@ -50,58 +50,54 @@ use image::GenericImageView;
 let dimensions = diffuse_image.dimensions();
 ```
 
-Here, we grab the bytes from our image file and load them into an image, which is then converted into a `Vec` of RGBA bytes. We also save the image's dimensions for when we create the actual `Texture`.
+여기서는 이미지 파일의 바이트를 가져와 이미지로 불러온 다음, RGBA 바이트의 `Vec`으로 변환합니다. 또한 실제 `Texture`를 만들 때 사용할 이미지의 크기도 저장합니다.
 
-Now, let's create the `Texture`:
+이제 `Texture`를 만들어 봅시다:
 
 ```rust
 let texture_size = wgpu::Extent3d {
     width: dimensions.0,
     height: dimensions.1,
-    // All textures are stored as 3D, we represent our 2D texture
-    // by setting depth to 1.
+    // 모든 텍스처는 3D로 저장되므로, 2D 텍스처는 깊이를 1로 설정하여 표현합니다.
     depth_or_array_layers: 1,
 };
 let diffuse_texture = device.create_texture(
     &wgpu::TextureDescriptor {
         size: texture_size,
-        mip_level_count: 1, // We'll talk about this a little later
+        mip_level_count: 1, // 잠시 후에 자세히 다룰 것입니다.
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
-        // Most images are stored using sRGB, so we need to reflect that here.
+        // 대부분의 이미지는 sRGB를 사용하여 저장되므로 여기서도 이를 반영해야 합니다.
         format: wgpu::TextureFormat::Rgba8UnormSrgb,
-        // TEXTURE_BINDING tells wgpu that we want to use this texture in shaders
-        // COPY_DST means that we want to copy data to this texture
+        // TEXTURE_BINDING은 wgpu에게 이 텍스처를 셰이더에서 사용하고 싶다는 것을 알립니다.
+        // COPY_DST는 이 텍스처에 데이터를 복사하고 싶다는 것을 의미합니다.
         usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
         label: Some("diffuse_texture"),
-        // This is the same as with the SurfaceConfig. It
-        // specifies what texture formats can be used to
-        // create TextureViews for this texture. The base
-        // texture format (Rgba8UnormSrgb in this case) is
-        // always supported. Note that using a different
-        // texture format is not supported on the WebGL2
-        // backend.
+        // SurfaceConfig와 동일합니다. 이 텍스처에 대한
+        // TextureView를 만드는 데 사용할 수 있는 텍스처 형식을 지정합니다.
+        // 기본 텍스처 형식(이 경우 Rgba8UnormSrgb)은 항상 지원됩니다.
+        // 다른 텍스처 형식을 사용하는 것은 WebGL2 백엔드에서 지원되지 않습니다.
         view_formats: &[],
     }
 );
 ```
 
-## Getting data into a Texture
+## 텍스처에 데이터 넣기
 
-The `Texture` struct has no methods to interact with the data directly. However, we can use a method on the `queue` we created earlier called `write_texture` to load in the texture. Let's take a look at how we do that:
+`Texture` 구조체에는 데이터와 직접 상호 작용하는 메서드가 없습니다. 하지만 이전에 만들었던 `queue`의 `write_texture` 메서드를 사용하여 텍스처를 불러올 수 있습니다. 어떻게 하는지 살펴봅시다:
 
 ```rust
 queue.write_texture(
-    // Tells wgpu where to copy the pixel data
+    // wgpu에게 픽셀 데이터를 어디에 복사할지 알려줍니다.
     wgpu::TexelCopyTextureInfo {
         texture: &diffuse_texture,
         mip_level: 0,
         origin: wgpu::Origin3d::ZERO,
         aspect: wgpu::TextureAspect::All,
     },
-    // The actual pixel data
+    // 실제 픽셀 데이터
     &diffuse_rgba,
-    // The layout of the texture
+    // 텍스처의 레이아웃
     wgpu::TexelCopyBufferLayout {
         offset: 0,
         bytes_per_row: Some(4 * dimensions.0),
@@ -113,7 +109,7 @@ queue.write_texture(
 
 <div class="note">
 
-The old way of writing data to a texture was to copy the pixel data to a buffer and then copy it to the texture. Using `write_texture` is a bit more efficient as it uses one buffer less - I'll leave it here, though, in case you need it.
+예전에는 픽셀 데이터를 버퍼에 복사한 다음 텍스처로 복사하는 방식으로 텍스처에 데이터를 썼습니다. `write_texture`를 사용하는 것이 버퍼를 하나 덜 사용하므로 조금 더 효율적입니다. 하지만 필요할 경우를 대비해 예전 방식도 여기에 남겨두겠습니다.
 
 ```rust
 let buffer = device.create_buffer_init(
@@ -141,25 +137,25 @@ encoder.copy_buffer_to_texture(
         array_layer: 0,
         origin: wgpu::Origin3d::ZERO,
     },
-    is_surface_configured: false,
+    texture_size,
 );
 
 queue.submit(std::iter::once(encoder.finish()));
 ```
 
-The `bytes_per_row` field needs some consideration. This value needs to be a multiple of 256. Check out [the gif tutorial](../../showcase/gifs/#how-do-we-make-the-frames) for more details.
+`bytes_per_row` 필드는 약간의 고려가 필요합니다. 이 값은 256의 배수여야 합니다. 자세한 내용은 [gif 튜토리얼](../../showcase/gifs/#how-do-we-make-the-frames)을 확인하세요.
 
 </div>
 
-## TextureViews and Samplers
+## TextureView와 Sampler
 
-Now that our texture has data in it, we need a way to use it. This is where a `TextureView` and a `Sampler` come in. A `TextureView` offers us a *view* into our texture. A `Sampler` controls how the `Texture` is *sampled*. Sampling works similar to the eyedropper tool in GIMP/Photoshop. Our program supplies a coordinate on the texture (known as a *texture coordinate*), and the sampler then returns the corresponding color based on the texture and some internal parameters.
+이제 텍스처에 데이터가 있으니, 이를 사용할 방법이 필요합니다. 여기서 `TextureView`와 `Sampler`가 등장합니다. `TextureView`는 텍스처에 대한 *뷰(view)*를 제공합니다. `Sampler`는 텍스처가 어떻게 *샘플링*되는지 제어합니다. 샘플링은 GIMP/Photoshop의 스포이드 도구와 비슷하게 작동합니다. 프로그램이 텍스처 위의 좌표(텍스처 좌표라고 함)를 제공하면, 샘플러는 텍스처와 일부 내부 매개변수를 기반으로 해당 색상을 반환합니다.
 
-Let's define our `diffuse_texture_view` and `diffuse_sampler` now:
+이제 `diffuse_texture_view`와 `diffuse_sampler`를 정의해 봅시다:
 
 ```rust
-// We don't need to configure the texture view much, so let's
-// let wgpu define it.
+// 텍스처 뷰는 많이 설정할 필요가 없으므로,
+// wgpu가 기본값으로 정의하도록 둡시다.
 let diffuse_texture_view = diffuse_texture.create_view(&wgpu::TextureViewDescriptor::default());
 let diffuse_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
     address_mode_u: wgpu::AddressMode::ClampToEdge,
@@ -172,29 +168,29 @@ let diffuse_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
 });
 ```
 
-The `address_mode_*` parameters determine what to do if the sampler gets a texture coordinate that's outside the texture itself. We have a few options to choose from:
+`address_mode_*` 매개변수는 샘플러가 텍스처 외부의 텍스처 좌표를 받았을 때 어떻게 처리할지를 결정합니다. 몇 가지 옵션이 있습니다:
 
-* `ClampToEdge`: Any texture coordinates outside the texture will return the color of the nearest pixel on the edges of the texture.
-* `Repeat`: The texture will repeat as texture coordinates exceed the texture's dimensions.
-* `MirrorRepeat`: Similar to `Repeat`, but the image will flip when going over boundaries.
+*   `ClampToEdge`: 텍스처 외부의 모든 텍스처 좌표는 텍스처 가장자리의 가장 가까운 픽셀 색상을 반환합니다.
+*   `Repeat`: 텍스처 좌표가 텍스처 크기를 초과하면 텍스처가 반복됩니다.
+*   `MirrorRepeat`: `Repeat`와 비슷하지만, 경계를 넘을 때 이미지가 뒤집힙니다.
 
 ![address_mode.png](./address_mode.png)
 
-The `mag_filter` and `min_filter` fields describe what to do when the sample footprint is smaller or larger than one texel. These two fields usually work when the mapping in the scene is far from or close to the camera.
+`mag_filter`와 `min_filter` 필드는 샘플링 영역이 한 텍셀(texel)보다 작거나 클 때 어떻게 처리할지를 설명합니다. 이 두 필드는 보통 씬의 매핑이 카메라에서 멀리 있거나 가까이 있을 때 작동합니다.
 
-There are two options:
-* `Linear`: Select two texels in each dimension and return a linear interpolation between their values.
-* `Nearest`: Return the texel value nearest to the texture coordinates. This creates an image that's crisper from far away but pixelated up close. This can be desirable, however, if your textures are designed to be pixelated, like in pixel art games or voxel games like Minecraft.
+두 가지 옵션이 있습니다:
+*   `Linear`: 각 차원에서 두 개의 텍셀을 선택하고 그 값들 사이의 선형 보간 값을 반환합니다.
+*   `Nearest`: 텍스처 좌표에 가장 가까운 텍셀 값을 반환합니다. 이렇게 하면 멀리서는 선명하지만 가까이서는 픽셀화된 이미지가 만들어집니다. 하지만 픽셀 아트 게임이나 마인크래프트 같은 복셀 게임처럼 텍스처가 의도적으로 픽셀화된 경우 바람직할 수 있습니다.
 
-Mipmaps are a complex topic and will require their own section in the future. For now, we can say that `mipmap_filter` functions are similar to `(mag/min)_filter` as it tells the sampler how to blend between mipmaps.
+밉맵(Mipmap)은 복잡한 주제이며 나중에 별도의 섹션에서 다룰 것입니다. 지금은 `mipmap_filter`가 `(mag/min)_filter`와 유사하게 샘플러가 밉맵 간에 어떻게 블렌딩할지를 알려주는 역할을 한다고 말할 수 있습니다.
 
-I'm using some defaults for the other fields. If you want to see what they are, check [the wgpu docs](https://docs.rs/wgpu/latest/wgpu/struct.SamplerDescriptor.html).
+다른 필드들에는 몇 가지 기본값을 사용하고 있습니다. 어떤 값들인지 보고 싶다면 [wgpu 문서](https://docs.rs/wgpu/latest/wgpu/struct.SamplerDescriptor.html)를 확인하세요.
 
-All these different resources are nice and all, but they don't do us much good if we can't plug them in anywhere. This is where `BindGroup`s and `PipelineLayout`s come in.
+이 모든 다른 리소스들은 좋지만, 어디에도 연결할 수 없다면 별 소용이 없습니다. 여기서 `BindGroup`과 `PipelineLayout`이 등장합니다.
 
-## The BindGroup
+## BindGroup
 
-A `BindGroup` describes a set of resources and how they can be accessed by a shader. We create a `BindGroup` using a `BindGroupLayout`. Let's make one of those first.
+`BindGroup`은 리소스의 집합과 셰이더에서 이들에 접근하는 방법을 설명합니다. `BindGroupLayout`을 사용하여 `BindGroup`을 만듭니다. 먼저 `BindGroupLayout`부터 만들어 봅시다.
 
 ```rust
 let texture_bind_group_layout =
@@ -213,8 +209,8 @@ let texture_bind_group_layout =
                     wgpu::BindGroupLayoutEntry {
                         binding: 1,
                         visibility: wgpu::ShaderStages::FRAGMENT,
-                        // This should match the filterable field of the
-                        // corresponding Texture entry above.
+                        // 이 값은 위에서 대응되는 Texture 항목의
+                        // filterable 필드와 일치해야 합니다.
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                         count: None,
                     },
@@ -223,9 +219,9 @@ let texture_bind_group_layout =
             });
 ```
 
-Our `texture_bind_group_layout` has two entries: one for a sampled texture at binding 0 and one for a sampler at binding 1. Both of these bindings are visible only to the fragment shader as specified by `FRAGMENT`. The possible values for this field are any bitwise combination of `NONE`, `VERTEX`, `FRAGMENT`, or `COMPUTE`. Most of the time, we'll only use `FRAGMENT` for textures and samplers, but it's good to know what else is available.
+우리의 `texture_bind_group_layout`에는 두 개의 항목이 있습니다: 바인딩 0에는 샘플링된 텍스처, 바인딩 1에는 샘플러입니다. 이 두 바인딩은 `FRAGMENT`로 지정된 대로 프래그먼트 셰이더에서만 접근 가능합니다. 이 필드에 가능한 값은 `NONE`, `VERTEX`, `FRAGMENT`, `COMPUTE`의 비트 단위 조합입니다. 대부분의 경우 텍스처와 샘플러에는 `FRAGMENT`만 사용하지만, 다른 옵션도 알아두면 좋습니다.
 
-With `texture_bind_group_layout`, we can now create our `BindGroup`:
+`texture_bind_group_layout`을 가지고 이제 `BindGroup`을 만들 수 있습니다:
 
 ```rust
 let diffuse_bind_group = device.create_bind_group(
@@ -246,57 +242,57 @@ let diffuse_bind_group = device.create_bind_group(
 );
 ```
 
-Looking at this, you might get a bit of déjà vu! That's because a `BindGroup` is a more specific declaration of the `BindGroupLayout`. The reason they're separate is that it allows us to swap out `BindGroup`s on the fly, so long as they all share the same `BindGroupLayout`. Each texture and sampler we create will need to be added to a `BindGroup`. For our purposes, we'll create a new bind group for each texture.
+이 코드를 보면 데자뷔를 느낄 수도 있습니다! 이는 `BindGroup`이 `BindGroupLayout`의 더 구체적인 선언이기 때문입니다. 이 둘이 분리된 이유는 실행 중에 `BindGroup`을 교체할 수 있게 하기 위함입니다. 단, 교체되는 `BindGroup`들은 모두 동일한 `BindGroupLayout`을 공유해야 합니다. 우리가 만드는 각각의 텍스처와 샘플러는 `BindGroup`에 추가되어야 합니다. 우리의 목적을 위해, 각 텍스처마다 새로운 바인드 그룹을 만들 것입니다.
 
-Now that we have our `diffuse_bind_group`, let's add it to our `State` struct:
+이제 `diffuse_bind_group`이 생겼으니 `State` 구조체에 추가합시다:
 
 ```rust
-pub struct State {
-    surface: wgpu::Surface<'static>,
+pub struct State<'a> {
+    surface: wgpu::Surface<'a>,
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
-    is_surface_configured: bool,
-    window: &'a wgpu::Window,
+    size: winit::dpi::PhysicalSize<u32>,
+    window: &'a Window,
     render_pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     num_indices: u32,
-    diffuse_bind_group: wgpu::BindGroup, // NEW!
+    diffuse_bind_group: wgpu::BindGroup, // 새로운 필드!
 }
 ```
 
-Make sure we return these fields in the `new` method:
+`new` 메서드에서 이 필드들을 반환하는 것을 잊지 마세요:
 
 ```rust
-impl State {
-    async fn new() -> Self {
+impl<'a> State<'a> {
+    async fn new(window: &'a Window) -> Self {
         // ...
         Self {
+            window,
             surface,
             device,
             queue,
             config,
-            is_surface_configured: false,
-            window,
+            size,
             render_pipeline,
             vertex_buffer,
             index_buffer,
             num_indices,
-            // NEW!
+            // 새로운 필드!
             diffuse_bind_group,
         }
     }
 }
 ```
 
-Now that we've got our `BindGroup`, we can use it in our `render()` function.
+이제 `BindGroup`이 준비되었으니, `render()` 함수에서 사용할 수 있습니다.
 
 ```rust
 // render()
 // ...
 render_pass.set_pipeline(&self.render_pipeline);
-render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]); // NEW!
+render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]); // 새로운 코드!
 render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
 render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
 
@@ -305,7 +301,7 @@ render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
 
 ## PipelineLayout
 
-Remember the `PipelineLayout` we created back in [the pipeline section](/learn-wgpu/beginner/tutorial3-pipeline#how-do-we-use-the-shaders)? Now, we finally get to use it! The `PipelineLayout` contains a list of `BindGroupLayout`s that the pipeline can use. Modify `render_pipeline_layout` to use our `texture_bind_group_layout`.
+[파이프라인 섹션](/learn-wgpu/beginner/tutorial3-pipeline#how-do-we-use-the-shaders)에서 만들었던 `PipelineLayout`을 기억하시나요? 이제 드디어 그것을 사용할 시간입니다! `PipelineLayout`은 파이프라인이 사용할 수 있는 `BindGroupLayout`의 목록을 포함합니다. `render_pipeline_layout`이 우리의 `texture_bind_group_layout`을 사용하도록 수정합시다.
 
 ```rust
 async fn new(...) {
@@ -313,7 +309,7 @@ async fn new(...) {
     let render_pipeline_layout = device.create_pipeline_layout(
         &wgpu::PipelineLayoutDescriptor {
             label: Some("Render Pipeline Layout"),
-            bind_group_layouts: &[&texture_bind_group_layout], // NEW!
+            bind_group_layouts: &[&texture_bind_group_layout], // 새로운 코드!
             push_constant_ranges: &[],
         }
     );
@@ -321,27 +317,27 @@ async fn new(...) {
 }
 ```
 
-## A change to the VERTICES
-There are a few things we need to change about our `Vertex` definition. Up to now, we've been using a `color` attribute to set the color of our mesh. Now that we're using a texture, we want to replace our `color` with `tex_coords`. These coordinates will then be passed to the `Sampler` to retrieve the appropriate color.
+## VERTICES 변경하기
+`Vertex` 정의에 몇 가지 변경이 필요합니다. 지금까지는 `color` 속성을 사용하여 메쉬의 색상을 설정했습니다. 이제 텍스처를 사용하므로 `color`를 `tex_coords`로 바꿔야 합니다. 이 좌표들은 `Sampler`에 전달되어 적절한 색상을 가져오게 됩니다.
 
-Since our `tex_coords` are two-dimensional, we'll change the field to take two floats instead of three.
+`tex_coords`는 2차원이므로, 필드를 3개의 float 대신 2개의 float를 받도록 변경할 것입니다.
 
-First, we'll change the `Vertex` struct:
+먼저, `Vertex` 구조체를 변경합니다:
 
 ```rust
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct Vertex {
     position: [f32; 3],
-    tex_coords: [f32; 2], // NEW!
+    tex_coords: [f32; 2], // 새로운 필드!
 }
 ```
 
-And then reflect these changes in the `VertexBufferLayout`:
+그리고 `VertexBufferLayout`에 이 변경 사항을 반영합니다:
 
 ```rust
 impl Vertex {
-    fn desc() -> wgpu::VertexBufferLayout<'static> {
+    fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
         use std::mem;
         wgpu::VertexBufferLayout {
             array_stride: mem::size_of::<Vertex>() as wgpu::BufferAddress,
@@ -355,7 +351,7 @@ impl Vertex {
                 wgpu::VertexAttribute {
                     offset: mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
                     shader_location: 1,
-                    format: wgpu::VertexFormat::Float32x2, // NEW!
+                    format: wgpu::VertexFormat::Float32x2, // 새로운 형식!
                 },
             ]
         }
@@ -363,10 +359,10 @@ impl Vertex {
 }
 ```
 
-Lastly, we need to change `VERTICES` itself. Replace the existing definition with the following:
+마지막으로, `VERTICES` 자체를 변경해야 합니다. 기존 정의를 다음으로 교체하세요:
 
 ```rust
-// Changed
+// 변경됨
 const VERTICES: &[Vertex] = &[
     Vertex { position: [-0.0868241, 0.49240386, 0.0], tex_coords: [0.4131759, 0.99240386], }, // A
     Vertex { position: [-0.49513406, 0.06958647, 0.0], tex_coords: [0.0048659444, 0.56958647], }, // B
@@ -376,12 +372,12 @@ const VERTICES: &[Vertex] = &[
 ];
 ```
 
-## Shader time
+## 셰이더 시간
 
-With our new `Vertex` structure in place, it's time to update our shaders. We'll first need to pass our `tex_coords` into the vertex shader and then use them over to our fragment shader to get the final color from the `Sampler`. Let's start with the vertex shader:
+새로운 `Vertex` 구조가 준비되었으니, 이제 셰이더를 업데이트할 시간입니다. 먼저 정점 셰이더에 `tex_coords`를 전달하고, 이를 프래그먼트 셰이더로 넘겨 `Sampler`에서 최종 색상을 얻어야 합니다. 정점 셰이더부터 시작하겠습니다:
 
 ```wgsl
-// Vertex shader
+// 정점 셰이더
 
 struct VertexInput {
     @location(0) position: vec3<f32>,
@@ -404,10 +400,10 @@ fn vs_main(
 }
 ```
 
-Now that we have our vertex shader outputting our `tex_coords`, we need to change the fragment shader to take them in. With these coordinates, we'll finally be able to use our sampler to get a color from our texture.
+이제 정점 셰이더가 `tex_coords`를 출력하므로, 프래그먼트 셰이더가 이를 입력으로 받도록 변경해야 합니다. 이 좌표들을 가지고 드디어 샘플러를 사용하여 텍스처에서 색상을 얻을 수 있습니다.
 
 ```wgsl
-// Fragment shader
+// 프래그먼트 셰이더
 
 @group(0) @binding(0)
 var t_diffuse: texture_2d<f32>;
@@ -420,23 +416,23 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 }
 ```
 
-The variables `t_diffuse` and `s_diffuse` are what's known as uniforms. We'll go over uniforms more in the [cameras section](/beginner/tutorial6-uniforms/). For now, all we need to know is that `group()` corresponds to the 1st parameter in `set_bind_group()` and `binding()` relates to the `binding` specified when we created the `BindGroupLayout` and `BindGroup`.
+`t_diffuse`와 `s_diffuse` 변수는 유니폼(uniform)이라고 알려진 것입니다. 유니폼에 대해서는 [카메라 섹션](/beginner/tutorial6-uniforms/)에서 더 자세히 다룰 것입니다. 지금은 `group()`이 `set_bind_group()`의 첫 번째 매개변수에 해당하고, `binding()`이 `BindGroupLayout`과 `BindGroup`을 만들 때 지정한 `binding`에 관련된다는 것만 알면 됩니다.
 
-## The results
+## 결과
 
-If we run our program now, we should get the following result:
+이제 프로그램을 실행하면 다음과 같은 결과를 얻을 수 있습니다:
 
 ![an upside down tree on a pentagon](./upside-down.png)
 
-That's weird. Our tree is upside down! This is because wgpu's world coordinates have the y-axis pointing up, while texture coordinates have the y-axis pointing down. In other words, (0, 0) in texture coordinates corresponds to the top-left of the image, while (1, 1) is the bottom right.
+이상하네요. 나무가 거꾸로 뒤집혀 있습니다! 이는 wgpu의 월드 좌표계는 y축이 위를 향하는 반면, 텍스처 좌표계는 y축이 아래를 향하기 때문입니다. 다시 말해, 텍스처 좌표의 (0, 0)은 이미지의 왼쪽 상단에 해당하고 (1, 1)은 오른쪽 하단에 해당합니다.
 
 ![happy-tree-uv-coords.png](./happy-tree-uv-coords.png)
 
-We can get our triangle right-side up by replacing the y coordinate `y` of each texture coordinate with `1 - y`:
+각 텍스처 좌표의 y 좌표 `y`를 `1 - y`로 바꾸면 삼각형을 바로 세울 수 있습니다:
 
 ```rust
 const VERTICES: &[Vertex] = &[
-    // Changed
+    // 변경됨
     Vertex { position: [-0.0868241, 0.49240386, 0.0], tex_coords: [0.4131759, 0.00759614], }, // A
     Vertex { position: [-0.49513406, 0.06958647, 0.0], tex_coords: [0.0048659444, 0.43041354], }, // B
     Vertex { position: [-0.21918549, -0.44939706, 0.0], tex_coords: [0.28081453, 0.949397], }, // C
@@ -445,30 +441,27 @@ const VERTICES: &[Vertex] = &[
 ];
 ```
 
-With that in place, we now have our tree right-side up on our pentagon:
+이 코드를 적용하면 이제 오각형 위에 나무가 바로 서 있는 것을 볼 수 있습니다:
 
 ![our happy tree as it should be](./rightside-up.png)
 
-## Cleaning things up
+## 코드 정리하기
 
-For convenience, let's pull our texture code into its own module. We'll first need to add the [anyhow](https://docs.rs/anyhow/) crate to our `Cargo.toml` file to simplify error handling;
+편의를 위해, 텍스처 코드를 별도의 모듈로 분리합시다. 먼저 오류 처리를 단순화하기 위해 `Cargo.toml` 파일에 [anyhow](https://docs.rs/anyhow/) 크레이트를 추가해야 합니다.
 
 ```toml
 [dependencies]
-image = "0.23"
-cgmath = "0.18"
-winit = { version = "0.30", features = ["android-native-activity"] }
-env_logger = "0.10"
-log = "0.4"
-pollster = "0.3"
-wgpu = "25.0"bytemuck = { version = "1.16", features = [ "derive" ] } # NEW!
+# ... (기존 의존성들)
+anyhow = "1.0" # 새로운 의존성!
+# bytemuck은 derive 기능이 필요합니다.
+bytemuck = { version = "1.12", features = [ "derive" ] }
 ```
 
-Then, in a new file called `src/texture.rs`, add the following:
+그런 다음 `src/texture.rs`라는 새 파일에 다음 코드를 추가하세요:
 
 ```rust
 use image::GenericImageView;
-use anyhow::*;
+use anyhow::Result;
 
 pub struct Texture {
     #[allow(unused)]
@@ -505,7 +498,7 @@ impl Texture {
         let texture = device.create_texture(
             &wgpu::TextureDescriptor {
                 label,
-                is_surface_configured: false,
+                size,
                 mip_level_count: 1,
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
@@ -517,10 +510,10 @@ impl Texture {
 
         queue.write_texture(
             wgpu::TexelCopyTextureInfo {
-                aspect: wgpu::TextureAspect::All,
                 texture: &texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
             },
             &rgba,
             wgpu::TexelCopyBufferLayout {
@@ -551,17 +544,17 @@ impl Texture {
 
 <div class="note">
 
-Notice that we're using `to_rgba8()` instead of `as_rgba8()`. PNGs work fine with `as_rgba8()`, as they have an alpha channel. But JPEGs don't have an alpha channel, and the code would panic if we try to call `as_rgba8()` on the JPEG texture image we are going to use. Instead, we can use `to_rgba8()` to handle such an image, which will generate a new image buffer with an alpha channel even if the original image does not have one.
+`as_rgba8()` 대신 `to_rgba8()`을 사용하고 있음을 주목하세요. PNG는 알파 채널이 있으므로 `as_rgba8()`으로도 잘 작동합니다. 하지만 JPEG는 알파 채널이 없어서 우리가 사용할 JPEG 텍스처 이미지에 `as_rgba8()`을 호출하면 코드가 패닉을 일으킬 것입니다. 대신 `to_rgba8()`을 사용하면 원본 이미지에 알파 채널이 없더라도 알파 채널이 있는 새 이미지 버퍼를 생성하여 이러한 이미지를 처리할 수 있습니다.
 
 </div>
 
-We need to import `texture.rs` as a module, so at the top of `lib.rs` add the following.
+`texture.rs`를 모듈로 가져와야 하므로, `lib.rs` 상단에 다음을 추가하세요.
 
 ```rust
 mod texture;
 ```
 
-The texture creation code in `new()` now gets a lot simpler:
+이제 `new()`의 텍스처 생성 코드가 훨씬 간단해집니다:
 
 ```rust
 let config = wgpu::SurfaceConfiguration {
@@ -575,13 +568,13 @@ let config = wgpu::SurfaceConfiguration {
     desired_maximum_frame_latency: 2,
 };
 
-let diffuse_bytes = include_bytes!("happy-tree.png"); // CHANGED!
-let diffuse_texture = texture::Texture::from_bytes(&device, &queue, diffuse_bytes, "happy-tree.png").unwrap(); // CHANGED!
+let diffuse_bytes = include_bytes!("happy-tree.png"); // 변경됨!
+let diffuse_texture = texture::Texture::from_bytes(&device, &queue, diffuse_bytes, "happy-tree.png").unwrap(); // 변경됨!
 
-// Everything up until `let texture_bind_group_layout = ...` can now be removed.
+// `let texture_bind_group_layout = ...`까지의 모든 코드를 이제 제거할 수 있습니다.
 ```
 
-We still need to store the bind group separately so that `Texture` doesn't need to know how the `BindGroup` is laid out. The creation of `diffuse_bind_group` slightly changes to use the `view` and `sampler` fields of `diffuse_texture`:
+`Texture`가 `BindGroup`의 레이아웃을 알 필요가 없도록 바인드 그룹은 여전히 별도로 저장해야 합니다. `diffuse_bind_group`의 생성은 `diffuse_texture`의 `view`와 `sampler` 필드를 사용하도록 약간 변경됩니다:
 
 ```rust
 let diffuse_bind_group = device.create_bind_group(
@@ -590,11 +583,11 @@ let diffuse_bind_group = device.create_bind_group(
         entries: &[
             wgpu::BindGroupEntry {
                 binding: 0,
-                resource: wgpu::BindingResource::TextureView(&diffuse_texture.view), // CHANGED!
+                resource: wgpu::BindingResource::TextureView(&diffuse_texture.view), // 변경됨!
             },
             wgpu::BindGroupEntry {
                 binding: 1,
-                resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler), // CHANGED!
+                resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler), // 변경됨!
             }
         ],
         label: Some("diffuse_bind_group"),
@@ -602,13 +595,13 @@ let diffuse_bind_group = device.create_bind_group(
 );
 ```
 
-Finally, let's update our `State` field to use our shiny new `Texture` struct, as we'll need it in future tutorials.
+마지막으로, 향후 튜토리얼에서 필요할 것이므로 `State` 필드를 업데이트하여 우리의 새로운 `Texture` 구조체를 사용하도록 합시다.
 
 ```rust
 pub struct State {
     // ...
     diffuse_bind_group: wgpu::BindGroup,
-    diffuse_texture: texture::Texture, // NEW
+    diffuse_texture: texture::Texture, // 새로운 필드
 }
 ```
 
@@ -620,22 +613,22 @@ impl State {
             // ...
             num_indices,
             diffuse_bind_group,
-            diffuse_texture, // NEW
+            diffuse_texture, // 새로운 필드
         }
     }
 }
 ```
 
-Phew!
+휴!
 
-With these changes in place, the code should be working the same as before, but we now have a much easier way to create textures.
+이 변경 사항들이 적용되면 코드는 이전과 동일하게 작동하지만, 이제 텍스처를 훨씬 쉽게 만들 수 있는 방법을 갖게 되었습니다.
 
-## Demo
+## 데모
 
 <WasmExample example="tutorial5_textures"></WasmExample>
 
 <AutoGithubLink/>
 
-## Challenge
+## 도전 과제
 
-Create another texture and swap it out when you press the space key.
+다른 텍스처를 하나 더 만들고, 스페이스 키를 누르면 텍스처를 교체하도록 만들어 보세요.

@@ -1,3 +1,3 @@
-# Foreword
+# 들어가며
 
-The articles in this section are not meant to be tutorials. They are showcases of the various things you can do with `wgpu`. I won't go over the specifics of creating `wgpu` resources, as those will be covered elsewhere. The code for these examples is still available however and will be accessible on Github.
+이 장의 글들은 튜토리얼을 목적으로 작성되지 않았습니다. `wgpu`를 활용하여 어떤 다양한 작업들을 할 수 있는지 보여주는 예시 모음입니다. `wgpu` 리소스를 만드는 세부 사항은 다른 글에서 다룰 것이므로 여기서는 깊이 들어가지 않습니다. 그렇지만 예제 코드는 Github를 통해 모두 제공됩니다.

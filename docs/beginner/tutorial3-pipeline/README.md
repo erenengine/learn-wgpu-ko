@@ -1,54 +1,51 @@
-# The Pipeline
+# 파이프라인
 
-## What's a pipeline?
+## 파이프라인이란 무엇일까요?
 
-If you're familiar with OpenGL, you may remember using shader programs. You can think of a pipeline as a more robust version of that. A pipeline describes all the actions the GPU will perform when acting on a set of data. In this section, we will be creating a `RenderPipeline` specifically.
+OpenGL에 익숙하다면 셰이더 프로그램을 사용했던 것을 기억하실 겁니다. 파이프라인은 그것의 더 강력한(robust) 버전이라고 생각할 수 있습니다. 파이프라인은 GPU가 특정 데이터 집합에 대해 수행할 모든 작업을 설명합니다. 이 섹션에서는 특별히 `RenderPipeline`(렌더 파이프라인)을 만들어 보겠습니다.
 
-## Wait, shaders?
+## 잠깐, 셰이더라고요?
 
-Shaders are mini-programs that you send to the GPU to perform operations on your data. There are three main types of shaders: vertex, fragment, and compute. There are others, such as geometry shaders or tesselation shaders, but they're not supported by WebGL. They should be avoided in general ([see discussions](https://community.khronos.org/t/does-the-use-of-geometric-shaders-significantly-reduce-performance/106326)). For now, we're just going to use vertex and fragment shaders.
+셰이더는 데이터에 대한 연산을 수행하기 위해 GPU로 보내는 작은 프로그램입니다. 주로 세 가지 유형의 셰이더가 있습니다: 정점(vertex), 프래그먼트(fragment), 그리고 컴퓨트(compute) 셰이더입니다. 지오메트리 셰이더나 테셀레이션 셰이더와 같은 다른 종류도 있지만, WebGL에서는 지원되지 않습니다. 이들은 일반적으로 피하는 것이 좋습니다 ([관련 토론 보기](https://community.khronos.org/t/does-the-use-of-geometric-shaders-significantly-reduce-performance/106326)). 지금은 정점 셰이더와 프래그먼트 셰이더만 사용할 것입니다.
 
-## Vertex, fragment... what are those?
+## 정점, 프래그먼트... 그게 뭔가요?
 
-A vertex is a point in 3D space (can also be 2D). These vertices are then bundled in groups of 2s to form lines and/or 3s to form triangles.
+정점(vertex)은 3D(또는 2D) 공간의 한 점입니다. 이 정점들은 2개씩 묶여 선을 이루거나, 3개씩 묶여 삼각형을 이룹니다.
 
-<img alt="Vertices Graphic" src="./tutorial3-pipeline-vertices.png" />
+<img alt="정점 그래픽" src="./tutorial3-pipeline-vertices.png" />
 
-Most modern rendering uses triangles to make all shapes, from simple shapes (such as cubes) to complex ones (such as people). These triangles are stored as vertices, which are the points that make up the corners of the triangles.
+대부분의 최신 렌더링은 삼각형을 사용하여 간단한 도형(큐브 등)부터 복잡한 모양(사람 등)까지 모든 형태를 만듭니다. 이 삼각형들은 정점들로 저장되는데, 이 정점들은 삼각형의 각 꼭짓점을 구성하는 점들입니다.
 
-<!-- Todo: Find/make an image to put here -->
+<!-- Todo: 여기에 넣을 이미지 찾기/만들기 -->
 
-We use a vertex shader to manipulate the vertices in order to transform the shape to look the way we want it.
+우리는 정점 셰이더를 사용하여 정점들을 조작하고, 원하는 모양으로 변형시킵니다.
 
-The vertices are then converted into fragments. Every pixel in the result image gets at least one fragment. Each fragment has a color that will be copied to its corresponding pixel. The fragment shader decides what color the fragment will be.
+그 후 정점들은 프래그먼트(fragment)로 변환됩니다. 결과 이미지의 모든 픽셀은 최소 하나의 프래그먼트를 갖게 됩니다. 각 프래그먼트는 해당하는 픽셀에 복사될 색상을 가집니다. 프래그먼트 셰이더는 프래그먼트가 어떤 색을 가질지 결정합니다.
 
 ## WGSL
 
-[WebGPU Shading Language](https://www.w3.org/TR/WGSL/) (WGSL) is the shader language for WebGPU.
-WGSL's development focuses on getting it to easily convert into the shader language corresponding to the backend; for example, SPIR-V for Vulkan, MSL for Metal, HLSL for DX12, and GLSL for OpenGL.
-The conversion is done internally, and we usually don't need to care about the details.
-In the case of wgpu, it's done by the library called [naga](https://github.com/gfx-rs/naga).
+[WebGPU 셰이딩 언어(WebGPU Shading Language)](https://www.w3.org/TR/WGSL/) (WGSL)는 WebGPU를 위한 셰이더 언어입니다. WGSL의 개발은 백엔드에 해당하는 셰이더 언어로 쉽게 변환되는 것에 초점을 맞추고 있습니다. 예를 들어, Vulkan을 위한 SPIR-V, Metal을 위한 MSL, DX12를 위한 HLSL, OpenGL을 위한 GLSL로 변환됩니다. 이 변환은 내부적으로 이루어지며, 우리는 보통 세부 사항에 대해 신경 쓸 필요가 없습니다. wgpu의 경우, 이 작업은 [naga](https://github.com/gfx-rs/naga)라는 라이브러리에 의해 수행됩니다.
 
-Note that, at the time of writing this, some WebGPU implementations also support SPIR-V, but it's just a temporary measure during the transition period to WGSL and will be removed (If you are curious about the drama behind SPIR-V and WGSL, please refer to [this blog post](https://kvark.github.io/spirv/2021/05/01/spirv-horrors.html)).
+참고로, 이 글을 쓰는 시점에서 일부 WebGPU 구현은 SPIR-V도 지원하지만, 이는 WGSL로 전환하는 과도기 동안의 임시 조치일 뿐이며 제거될 예정입니다 (SPIR-V와 WGSL 이면의 드라마가 궁금하다면, [이 블로그 포스트](https://kvark.github.io/spirv/2021/05/01/spirv-horrors.html)를 참조하세요).
 
 <div class="note">
 
-If you've gone through this tutorial before, you'll likely notice that I've switched from using GLSL to using WGSL. Given that GLSL support is a secondary concern and that WGSL is the first-class language of WGPU, I've elected to convert all the tutorials to use WGSL. Some showcase examples still use GLSL, but the main tutorial and all examples going forward will be using WGSL.
+이전에 이 튜토리얼을 보신 분이라면 GLSL 대신 WGSL을 사용하도록 바뀐 것을 눈치채셨을 겁니다. GLSL 지원이 부차적인 관심사이고 WGSL이 WGPU의 핵심 언어라는 점을 고려하여, 모든 튜토리얼을 WGSL을 사용하도록 전환하기로 결정했습니다. 일부 쇼케이스 예제는 여전히 GLSL을 사용하지만, 메인 튜토리얼과 앞으로의 모든 예제는 WGSL을 사용할 것입니다.
 
 </div>
 
 <div class="note">
 
-The WGSL spec and its inclusion in WGPU are still in development. If you run into trouble using it, you may want the folks at [https://app.element.io/#/room/#wgpu:matrix.org](https://app.element.io/#/room/#wgpu:matrix.org) to take a look at your code.
+WGSL 명세와 WGPU에의 포함은 아직 개발 중입니다. 사용 중 문제가 발생하면 [https://app.element.io/#/room/#wgpu:matrix.org](https://app.element.io/#/room/#wgpu:matrix.org)의 사람들에게 코드를 보여주는 것이 도움이 될 수 있습니다.
 
 </div>
 
-## Writing the shaders
+## 셰이더 작성하기
 
-In the same folder as `main.rs`, create a file `shader.wgsl`. Write the following code in `shader.wgsl`.
+`main.rs`와 같은 폴더에 `shader.wgsl` 파일을 만듭니다. `shader.wgsl`에 다음 코드를 작성하세요.
 
 ```wgsl
-// Vertex shader
+// 정점 셰이더
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
@@ -66,53 +63,53 @@ fn vs_main(
 }
 ```
 
-First, we declare `struct` to store the output of our vertex shader. This currently consists of only one field, which is our vertex's `clip_position`. The `@builtin(position)` bit tells WGPU that this is the value we want to use as the vertex's [clip coordinates](https://en.wikipedia.org/wiki/Clip_coordinates). This is analogous to GLSL's `gl_Position` variable.
+먼저, 정점 셰이더의 출력을 저장할 `struct`(구조체)를 선언합니다. 현재는 단 하나의 필드, 즉 정점의 `clip_position`만 있습니다. `@builtin(position)` 부분은 WGPU에게 이 값을 정점의 [클립 좌표(clip coordinates)](https://en.wikipedia.org/wiki/Clip_coordinates)로 사용하라고 알려줍니다. 이는 GLSL의 `gl_Position` 변수와 유사합니다.
 
 <div class="note">
 
-Vector types such as `vec4` are generic. Currently, you must specify the type of value the vector will contain. Thus, a 3D vector using 32bit floats would be `vec3<f32>`.
+`vec4`와 같은 벡터 타입은 제네릭입니다. 현재는 벡터가 담을 값의 타입을 명시해야 합니다. 따라서 32비트 부동소수점을 사용하는 3D 벡터는 `vec3<f32>`가 됩니다.
 
 </div>
 
-The next part of the shader code is the `vs_main` function. We are using `@vertex` to mark this function as a valid entry point for a vertex shader. We expect a `u32` called `in_vertex_index`, which gets its value from `@builtin(vertex_index)`.
+셰이더 코드의 다음 부분은 `vs_main` 함수입니다. `@vertex`를 사용하여 이 함수가 정점 셰이더의 유효한 진입점임을 표시합니다. 우리는 `@builtin(vertex_index)`로부터 값을 받는 `in_vertex_index`라는 `u32`를 입력으로 받습니다.
 
-We then declare a variable called `out` using our `VertexOutput` struct. We create two other variables for the `x` and `y` of a triangle.
+그런 다음 `VertexOutput` 구조체를 사용하여 `out`이라는 변수를 선언합니다. 그리고 삼각형의 `x`와 `y`를 위한 두 개의 다른 변수를 만듭니다.
 
 <div class="note">
 
-The `f32()` and `i32()` bits are examples of casts.
+`f32()`와 `i32()` 부분은 캐스팅(casting)의 예입니다.
 
 </div>
 
 <div class="note">
 
-Variables defined with `var` can be modified but must specify their type. Variables created with `let` can have their types inferred, but their value cannot be changed during the shader.
+`var`로 정의된 변수는 수정할 수 있지만 타입을 명시해야 합니다. `let`으로 생성된 변수는 타입을 추론할 수 있지만, 셰이더 내에서 값을 변경할 수 없습니다.
 
 </div>
 
-Now we can save our `clip_position` to `out`. We then just return `out`, and we're done with the vertex shader!
+이제 `clip_position`을 `out`에 저장할 수 있습니다. 그리고 `out`을 반환하면 정점 셰이더가 완성됩니다!
 
 <div class="note">
 
-We technically didn't need a struct for this example and could have just done something like the following:
+사실 이 예제에서는 구조체가 꼭 필요하지 않았고, 다음과 같이 할 수도 있었습니다:
 
 ```wgsl
 @vertex
 fn vs_main(
     @builtin(vertex_index) in_vertex_index: u32
 ) -> @builtin(position) vec4<f32> {
-    // Vertex shader code...
+    // 정점 셰이더 코드...
 }
 ```
 
-We'll be adding more fields to `VertexOutput` later, so we might as well start using it now.
+하지만 나중에 `VertexOutput`에 더 많은 필드를 추가할 것이므로, 지금부터 사용하는 것이 좋습니다.
 
 </div>
 
-Next up, the fragment shader. Still in `shader.wgsl` add the following:
+다음은 프래그먼트 셰이더입니다. 계속해서 `shader.wgsl`에 다음을 추가하세요:
 
 ```wgsl
-// Fragment shader
+// 프래그먼트 셰이더
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
@@ -120,19 +117,19 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 }
 ```
 
-This sets the color of the current fragment to brown.
+이 코드는 현재 프래그먼트의 색상을 갈색으로 설정합니다.
 
 <div class="note">
 
-Notice that the entry point for the vertex shader was named `vs_main` and that the entry point for the fragment shader is called `fs_main`. In earlier versions of wgpu, it was ok for both these functions to have the same name, but newer versions of the [WGSL spec](https://www.w3.org/TR/WGSL/#declaration-and-scope) require these names to be different. Therefore, the above-mentioned naming scheme (which is adopted from the `wgpu` examples) is used throughout the tutorial.
+정점 셰이더의 진입점 이름은 `vs_main`이고 프래그먼트 셰이더의 진입점 이름은 `fs_main`인 점에 주목하세요. 이전 버전의 wgpu에서는 두 함수의 이름이 같아도 괜찮았지만, 최신 [WGSL 명세](https://www.w3.org/TR/WGSL/#declaration-and-scope)에서는 이 이름들이 달라야 합니다. 따라서, 위에서 언급한 (`wgpu` 예제에서 채택한) 명명 규칙이 이 튜토리얼 전체에서 사용됩니다.
 
 </div>
 
-The `@location(0)` bit tells WGPU to store the `vec4` value returned by this function in the first color target. We'll get into what this is later.
+`@location(0)` 부분은 WGPU에게 이 함수가 반환하는 `vec4` 값을 첫 번째 색상 타겟(color target)에 저장하라고 지시합니다. 이것이 무엇인지는 나중에 다루겠습니다.
 
 <div class="note">
 
-Something to note about `@builtin(position)`, in the fragment shader, this value is in [framebuffer space](https://gpuweb.github.io/gpuweb/#coordinate-systems). This means that if your window is 800x600, the x and y of `clip_position` would be between 0-800 and 0-600, respectively, with the y = 0 being the top of the screen. This can be useful if you want to know the pixel coordinates of a given fragment, but if you want the position coordinates, you'll have to pass them in separately.
+`@builtin(position)`에 대해 주목할 점은, 프래그먼트 셰이더에서 이 값은 [프레임버퍼 공간(framebuffer space)](https://gpuweb.github.io/gpuweb/#coordinate-systems)에 있다는 것입니다. 즉, 창 크기가 800x600이라면 `clip_position`의 x와 y는 각각 0-800, 0-600 사이의 값이 되며, y = 0이 화면의 상단입니다. 이는 특정 프래그먼트의 픽셀 좌표를 알고 싶을 때 유용할 수 있지만, 위치 좌표를 원한다면 별도로 전달해야 합니다.
 
 ```wgsl
 struct VertexOutput {
@@ -155,9 +152,9 @@ fn vs_main(
 
 </div>
 
-## How do we use the shaders?
+## 셰이더는 어떻게 사용하나요?
 
-This is the part where we finally make the thing in the title: the pipeline. First, let's modify `State` to include the following.
+이제 드디어 제목에서 언급한 파이프라인을 만들 차례입니다. 먼저, `State`를 다음과 같이 수정하여 필드를 추가합시다.
 
 ```rust
 // lib.rs
@@ -173,7 +170,7 @@ pub struct State {
 }
 ```
 
-Now, let's move to the `new()` method and start making the pipeline. We'll have to load in those shaders we made earlier, as the `render_pipeline` requires those.
+이제 `new()` 메서드로 이동하여 파이프라인을 만들기 시작합시다. `render_pipeline`을 만들려면 이전에 만든 셰이더를 불러와야 합니다.
 
 ```rust
 let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -184,7 +181,7 @@ let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
 
 <div class="note">
 
-You can also use `include_wgsl!` macro as a small shortcut to create the `ShaderModuleDescriptor`.
+`include_wgsl!` 매크로를 사용하여 `ShaderModuleDescriptor`를 만드는 작은 단축키로 사용할 수도 있습니다.
 
 ```rust
 let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
@@ -192,7 +189,7 @@ let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
 
 </div>
 
-One more thing, we need to create a `PipelineLayout`. We'll get more into this after we cover `Buffer`s.
+한 가지 더, `PipelineLayout`을 만들어야 합니다. `Buffer`에 대해 다룬 후에 이 부분을 더 자세히 살펴보겠습니다.
 
 ```rust
 let render_pipeline_layout =
@@ -203,7 +200,7 @@ let render_pipeline_layout =
     });
 ```
 
-Finally, we have all we need to create the `render_pipeline`.
+드디어 `render_pipeline`을 만들 준비가 모두 끝났습니다.
 
 ```rust
 let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -225,15 +222,15 @@ let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescrip
         })],
         compilation_options: wgpu::PipelineCompilationOptions::default(),
     }),
-    // continued ...
+    // 계속...
 ```
 
-Several things to note here:
+여기서 주목할 몇 가지 사항이 있습니다:
 
-1. Here you can specify which function inside the shader should be the `entry_point`. These are the functions we marked with `@vertex` and `@fragment`
-2. The `buffers` field tells `wgpu` what type of vertices we want to pass to the vertex shader. We're specifying the vertices in the vertex shader itself, so we'll leave this empty. We'll put something there in the next tutorial.
-3. The `fragment` is technically optional, so you have to wrap it in `Some()`. We need it if we want to store color data to the `surface`.
-4. The `targets` field tells `wgpu` what color outputs it should set up. Currently, we only need one for the `surface`. We use the `surface`'s format so that copying to it is easy, and we specify that the blending should just replace old pixel data with new data. We also tell `wgpu` to write to all colors: red, blue, green, and alpha. *We'll talk more about* `color_state` *when we talk about textures.*
+1.  여기서 셰이더 내의 어떤 함수를 `entry_point`(진입점)로 사용할지 지정할 수 있습니다. 이들은 우리가 `@vertex`와 `@fragment`로 표시한 함수들입니다.
+2.  `buffers` 필드는 `wgpu`에 어떤 타입의 정점을 정점 셰이더로 전달할지 알려줍니다. 우리는 정점 셰이더 자체에서 정점을 지정하고 있으므로, 이 필드는 비워둡니다. 다음 튜토리얼에서 여기에 무언가를 넣을 것입니다.
+3.  `fragment`는 기술적으로 선택 사항이므로 `Some()`으로 감싸야 합니다. 색상 데이터를 `surface`에 저장하려면 이 필드가 필요합니다.
+4.  `targets` 필드는 `wgpu`에 어떤 색상 출력을 설정해야 하는지 알려줍니다. 현재는 `surface`를 위한 하나만 필요합니다. `surface`의 포맷을 사용하여 복사가 용이하도록 하고, 블렌딩은 이전 픽셀 데이터를 새 데이터로 교체하도록 지정합니다. 또한 `wgpu`에게 모든 색상(빨강, 파랑, 초록, 알파)에 쓰도록 지시합니다. *`color_state`에 대해서는 텍스처를 다룰 때 더 이야기하겠습니다.*
 
 ```rust
     primitive: wgpu::PrimitiveState {
@@ -241,20 +238,20 @@ Several things to note here:
         strip_index_format: None,
         front_face: wgpu::FrontFace::Ccw, // 2.
         cull_mode: Some(wgpu::Face::Back),
-        // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
+        // Fill 이외의 값으로 설정하려면 Features::NON_FILL_POLYGON_MODE가 필요합니다.
         polygon_mode: wgpu::PolygonMode::Fill,
-        // Requires Features::DEPTH_CLIP_CONTROL
+        // Features::DEPTH_CLIP_CONTROL이 필요합니다.
         unclipped_depth: false,
-        // Requires Features::CONSERVATIVE_RASTERIZATION
+        // Features::CONSERVATIVE_RASTERIZATION이 필요합니다.
         conservative: false,
     },
-    // continued ...
+    // 계속...
 ```
 
-The `primitive` field describes how to interpret our vertices when converting them into triangles.
+`primitive` 필드는 정점을 삼각형으로 변환할 때 어떻게 해석할지 설명합니다.
 
-1. Using `PrimitiveTopology::TriangleList` means that every three vertices will correspond to one triangle.
-2. The `front_face` and `cull_mode` fields tell `wgpu` how to determine whether a given triangle is facing forward or not. `FrontFace::Ccw` means that a triangle is facing forward if the vertices are arranged in a counter-clockwise direction. Triangles that are not considered facing forward are culled (not included in the render) as specified by `CullMode::Back`. We'll cover culling a bit more when we cover `Buffer`s.
+1.  `PrimitiveTopology::TriangleList`를 사용하면 매 세 개의 정점이 하나의 삼각형에 해당하게 됩니다.
+2.  `front_face`와 `cull_mode` 필드는 `wgpu`에 주어진 삼각형이 앞면을 향하고 있는지 여부를 결정하는 방법을 알려줍니다. `FrontFace::Ccw`는 정점이 반시계 방향으로 배열될 경우 삼각형이 앞면을 향하고 있음을 의미합니다. 앞면을 향하지 않는 것으로 간주되는 삼각형은 `CullMode::Back`에 지정된 대로 컬링됩니다(렌더링에 포함되지 않음). 컬링에 대해서는 `Buffer`를 다룰 때 좀 더 자세히 설명하겠습니다.
 
 ```rust
     depth_stencil: None, // 1.
@@ -268,18 +265,18 @@ The `primitive` field describes how to interpret our vertices when converting th
 });
 ```
 
-The rest of the method is pretty simple:
+메서드의 나머지 부분은 꽤 간단합니다:
 
-1. We're not using a depth/stencil buffer currently, so we leave `depth_stencil` as `None`. *This will change later*.
-2. `count` determines how many samples the pipeline will use. Multisampling is a complex topic, so we won't get into it here.
-3. `mask` specifies which samples should be active. In this case, we are using all of them.
-4. `alpha_to_coverage_enabled` has to do with anti-aliasing. We're not covering anti-aliasing here, so we'll leave this as false now.
-5. `multiview` indicates how many array layers the render attachments can have. We won't be rendering to array textures, so we can set this to `None`.
-6. `cache` allows wgpu to cache shader compilation data. Only really useful for Android build targets.
+1.  현재 깊이/스텐실 버퍼를 사용하지 않으므로 `depth_stencil`은 `None`으로 둡니다. *이것은 나중에 변경될 것입니다*.
+2.  `count`는 파이프라인이 사용할 샘플 수를 결정합니다. 멀티샘플링은 복잡한 주제이므로 여기서는 다루지 않겠습니다.
+3.  `mask`는 어떤 샘플이 활성화되어야 하는지를 지정합니다. 이 경우 모든 샘플을 사용합니다.
+4.  `alpha_to_coverage_enabled`는 안티에일리어싱과 관련이 있습니다. 여기서는 안티에일리어싱을 다루지 않으므로 지금은 `false`로 둡니다.
+5.  `multiview`는 렌더 첨부 파일이 가질 수 있는 배열 레이어의 수를 나타냅니다. 우리는 배열 텍스처에 렌더링하지 않을 것이므로 `None`으로 설정할 수 있습니다.
+6.  `cache`는 wgpu가 셰이더 컴파일 데이터를 캐시하도록 허용합니다. 안드로이드 빌드 타겟에만 유용합니다.
 
 <!-- https://gamedev.stackexchange.com/questions/22507/what-is-the-alphatocoverage-blend-state-useful-for -->
 
-Now, all we have to do is add the `render_pipeline` to `State`, and then we can use it!
+이제 `render_pipeline`을 `State`에 추가하기만 하면 사용할 수 있습니다!
 
 ```rust
 // new()
@@ -294,9 +291,9 @@ Ok(Self {
 })
 ```
 
-## Using a pipeline
+## 파이프라인 사용하기
 
-If you run your program now, it'll take a little longer to start, but it will still show the blue screen we got in the last section. That's because we created the `render_pipeline`, but we still need to modify the code in `render()` to actually use it.
+지금 프로그램을 실행하면 시작하는 데 시간이 조금 더 걸리지만, 여전히 지난 섹션에서 봤던 파란 화면이 나타날 것입니다. 이는 `render_pipeline`을 만들었지만, `render()`의 코드를 수정하여 실제로 사용하도록 해야 하기 때문입니다.
 
 ```rust
 // render()
@@ -307,7 +304,7 @@ If you run your program now, it'll take a little longer to start, but it will st
     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
         label: Some("Render Pass"),
         color_attachments: &[
-            // This is what @location(0) in the fragment shader targets
+            // 이것이 프래그먼트 셰이더의 @location(0)이 타겟하는 것입니다.
             Some(wgpu::RenderPassColorAttachment {
                 view: &view,
                 resolve_target: None,
@@ -334,22 +331,22 @@ If you run your program now, it'll take a little longer to start, but it will st
 // ...
 ```
 
-We didn't change much, but let's talk about what we did change.
+많이 바꾸지는 않았지만, 바뀐 부분에 대해 이야기해 봅시다.
 
-1. We renamed `_render_pass` to `render_pass` and made it mutable.
-2. We set the pipeline on the `render_pass` using the one we just created.
-3. We tell `wgpu` to draw *something* with three vertices and one instance. This is where `@builtin(vertex_index)` comes from.
+1.  `_render_pass`를 `render_pass`로 이름을 바꾸고 가변(mutable)으로 만들었습니다.
+2.  `render_pass`에 방금 만든 파이프라인을 설정했습니다.
+3.  `wgpu`에게 3개의 정점과 1개의 인스턴스로 *무언가*를 그리라고 지시합니다. 바로 여기서 `@builtin(vertex_index)`가 사용됩니다.
 
-With all that you should be seeing a lovely brown triangle.
+이 모든 것을 마치면 사랑스러운 갈색 삼각형을 보게 될 것입니다.
 
-![Said lovely brown triangle](./tutorial3-pipeline-triangle.png)
+![언급된 사랑스러운 갈색 삼각형](./tutorial3-pipeline-triangle.png)
 
-## Demo
+## 데모
 
 <WasmExample example="tutorial3_pipeline"></WasmExample>
 
 <AutoGithubLink/>
 
-## Challenge
+## 도전 과제
 
-Create a second pipeline that uses the triangle's position data to create a color that it then sends to the fragment shader. Have the app swap between these when you press the spacebar. *Hint: you'll need to modify* `VertexOutput`
+삼각형의 위치 데이터를 사용하여 색상을 만들고, 그 색상을 프래그먼트 셰이더로 보내는 두 번째 파이프라인을 만들어 보세요. 스페이스바를 누를 때마다 이 두 파이프라인이 서로 전환되도록 앱을 만들어 보세요. *힌트: `VertexOutput`을 수정해야 합니다.*

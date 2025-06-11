@@ -1,22 +1,22 @@
-# Working with Lights
+# 조명 다루기
 
-While we can tell our scene is 3D because of our camera, it still feels very flat. That's because our model stays the same color regardless of its orientation. If we want to change that, we need to add lighting to our scene.
+장면이 3D라는 것은 카메라 때문에 알 수 있지만, 여전히 매우 평평하게 느껴집니다. 이는 모델의 방향에 관계없이 색상이 동일하게 유지되기 때문입니다. 이를 바꾸고 싶다면 장면에 조명을 추가해야 합니다.
 
-In the real world, a light source emits photons that bounce around until they enter our eyes. The color we see is the light's original color minus whatever energy it lost while bouncing around.
+현실 세계에서 광원은 광자(photon)를 방출하고, 이 광자들이 여러 번 튕겨 다니다가 우리 눈으로 들어옵니다. 우리가 보는 색은 빛의 원래 색에서 튕기는 동안 잃어버린 에너지를 뺀 것입니다.
 
-In the computer graphics world, modeling individual photons would be hilariously computationally expensive. A single 100 Watt light bulb emits about 3.27 x 10^20 photons *per second*. Just imagine that for the sun! To get around this, we're going to use math to cheat.
+컴퓨터 그래픽 세계에서 개별 광자를 모델링하는 것은 터무니없이 계산 비용이 많이 듭니다. 100와트 전구 하나는 초당 약 3.27 x 10^20개의 광자를 방출합니다. 태양의 경우는 상상만 해도 끔찍하죠! 이를 해결하기 위해 우리는 수학을 사용해 속임수를 쓸 것입니다.
 
-Let's discuss a few options.
+몇 가지 옵션에 대해 논의해 봅시다.
 
-## Ray/Path Tracing
+## 레이/패스 트레이싱 (Ray/Path Tracing)
 
-This is an *advanced* topic, and we won't be covering it in depth here. It's the closest model to the way light really works so I felt I had to mention it. Check out the [ray tracing tutorial](../../todo/) if you want to learn more.
+이것은 *고급* 주제이며, 여기서 깊이 다루지는 않을 것입니다. 빛이 실제로 작동하는 방식에 가장 가까운 모델이기 때문에 언급할 필요가 있다고 느꼈습니다. 더 배우고 싶다면 [레이 트레이싱 튜토리얼](../../todo/)을 확인해 보세요.
 
-## The Blinn-Phong Model
+## 블린-퐁 모델 (The Blinn-Phong Model)
 
-Ray/path tracing is often too computationally expensive for most real-time applications (though that is starting to change), so a more efficient, if less accurate method based on the [Phong reflection model](https://en.wikipedia.org/wiki/Phong_shading) is often used. It splits up the lighting calculation into three parts: ambient lighting, diffuse lighting, and specular lighting. We're going to be learning the [Blinn-Phong model](https://en.wikipedia.org/wiki/Blinn%E2%80%93Phong_reflection_model), which cheats a bit at the specular calculation to speed things up.
+레이/패스 트레이싱은 대부분의 실시간 애플리케이션에는 계산 비용이 너무 많이 들기 때문에(최근에는 바뀌고 있지만), [퐁 반사 모델](https://ko.wikipedia.org/wiki/%ED%90%81_%EB%B0%98%EC%82%AC_%EB%AA%A8%EB%8D%B8)에 기반한 더 효율적이지만 덜 정확한 방법이 자주 사용됩니다. 이 모델은 조명 계산을 주변광(ambient), 난반사광(diffuse), 정반사광(specular) 세 부분으로 나눕니다. 우리는 [블린-퐁 모델](https://en.wikipedia.org/wiki/Blinn%E2%80%93Phong_reflection_model)을 배울 것이며, 이 모델은 정반사 계산에서 약간의 속임수를 써서 속도를 높입니다.
 
-Before we can get into that, though, we need to add a light to our scene.
+하지만 그전에, 장면에 조명을 추가해야 합니다.
 
 ```rust
 // lib.rs
@@ -24,27 +24,26 @@ Before we can get into that, though, we need to add a light to our scene.
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct LightUniform {
     position: [f32; 3],
-    // Due to uniforms requiring 16 byte (4 float) spacing, we need to use a padding field here
+    // 유니폼은 16바이트(4개의 float) 간격 정렬이 필요하므로, 여기에 패딩 필드를 사용해야 합니다.
     _padding: u32,
     color: [f32; 3],
-    // Due to uniforms requiring 16 byte (4 float) spacing, we need to use a padding field here
+    // 유니폼은 16바이트(4개의 float) 간격 정렬이 필요하므로, 여기에 패딩 필드를 사용해야 합니다.
     _padding2: u32,
 }
 ```
 
-Our `LightUniform` represents a colored point in space. We're just going to use pure white light, but it's good to allow different colors of light.
+`LightUniform`은 공간상의 색을 가진 한 점을 나타냅니다. 우리는 순수한 흰색 빛만 사용할 것이지만, 다른 색의 빛을 사용할 수 있도록 하는 것이 좋습니다.
 
 
 <div class="note">
 
-The rule of thumb for alignment with WGSL structs is field alignments are always powers of 2. For example, a `vec3` may only have three float fields, giving it a size of 12. The alignment will be bumped up to the next power of 2 being 16. This means that you have to be more careful with how you layout your struct in Rust.
+WGSL 구조체와의 정렬에 대한 경험 법칙은 필드 정렬이 항상 2의 거듭제곱이라는 것입니다. 예를 들어, `vec3`는 세 개의 float 필드만 가질 수 있어 크기가 12바이트입니다. 정렬은 다음 2의 거듭제곱인 16으로 맞춰집니다. 이는 Rust에서 구조체를 배치할 때 더 신중해야 함을 의미합니다.
 
-Some developers choose to use `vec4`s instead of `vec3`s to avoid alignment
-issues. You can learn more about the alignment rules in the [WGSL spec](https://www.w3.org/TR/WGSL/#alignment-and-size)
+일부 개발자들은 정렬 문제를 피하기 위해 `vec3` 대신 `vec4`를 사용하기도 합니다. 정렬 규칙에 대한 자세한 내용은 [WGSL 사양](https://www.w3.org/TR/WGSL/#alignment-and-size)에서 확인할 수 있습니다.
 
 </div>
 
-We're going to create another buffer to store our light in.
+이제 빛을 저장하기 위해 또 다른 버퍼를 만들 것입니다.
 
 ```rust
 let light_uniform = LightUniform {
@@ -54,7 +53,7 @@ let light_uniform = LightUniform {
     _padding2: 0,
 };
 
- // We'll want to update our lights position, so we use COPY_DST
+ // 빛의 위치를 업데이트할 것이므로 COPY_DST를 사용합니다.
 let light_buffer = device.create_buffer_init(
     &wgpu::util::BufferInitDescriptor {
         label: Some("Light VB"),
@@ -65,7 +64,7 @@ let light_buffer = device.create_buffer_init(
 ```
 
 
-Don't forget to add the `light_uniform` and `light_buffer` to `State`. After that, we need to create a bind group layout and bind group for our light.
+`light_uniform`과 `light_buffer`를 `State`에 추가하는 것을 잊지 마세요. 그 후, 빛을 위한 바인드 그룹 레이아웃과 바인드 그룹을 만들어야 합니다.
 
 ```rust
 let light_bind_group_layout =
@@ -93,22 +92,24 @@ let light_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
 });
 ```
 
-Add those to `State` and also update the `render_pipeline_layout`.
+이것들을 `State`에 추가하고 `render_pipeline_layout`도 업데이트하세요.
 
 ```rust
 let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+    label: Some("Render Pipeline Layout"), // 레이블 추가
     bind_group_layouts: &[
         &texture_bind_group_layout, 
         &camera_bind_group_layout,
         &light_bind_group_layout,
     ],
+    push_constant_ranges: &[], // 명시적으로 추가
 });
 ```
 
-Let's also update the light's position in the `update()` method to see what our objects look like from different angles.
+또한 `update()` 메서드에서 빛의 위치를 업데이트하여 다른 각도에서 객체가 어떻게 보이는지 확인해 봅시다.
 
 ```rust
-// Update the light
+// 빛 업데이트
 let old_position: cgmath::Vector3<_> = self.light_uniform.position.into();
 self.light_uniform.position =
     (cgmath::Quaternion::from_axis_angle((0.0, 1.0, 0.0).into(), cgmath::Deg(1.0))
@@ -117,12 +118,11 @@ self.light_uniform.position =
 self.queue.write_buffer(&self.light_buffer, 0, bytemuck::cast_slice(&[self.light_uniform]));
 ```
 
-This will have the light rotate around the origin one degree every frame.
+이렇게 하면 빛이 매 프레임마다 원점 주위를 1도씩 회전하게 됩니다.
 
-## Seeing the light
+## 빛 보기
 
-For debugging purposes, it would be nice if we could see where the light is to make sure that the scene looks correct. We could adapt our existing render pipeline to draw the light, but it will likely get in the way. Instead, we are going to extract our render pipeline creation code into a new function called `create_render_pipeline()`.
-
+디버깅 목적으로, 장면이 올바르게 보이는지 확인하기 위해 빛이 어디에 있는지 볼 수 있다면 좋을 것입니다. 기존 렌더 파이프라인을 수정하여 빛을 그릴 수도 있지만, 방해가 될 가능성이 높습니다. 대신, 렌더 파이프라인 생성 코드를 `create_render_pipeline()`이라는 새 함수로 추출할 것입니다.
 
 ```rust
 fn create_render_pipeline(
@@ -140,13 +140,13 @@ fn create_render_pipeline(
         layout: Some(layout),
         vertex: wgpu::VertexState {
             module: &shader,
-            entry_point: Some("vs_main"),
+            entry_point: "vs_main", // Some() 제거 가능
             buffers: vertex_layouts,
             compilation_options: Default::default(),
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader,
-            entry_point: Some("fs_main"),
+            entry_point: "fs_main", // Some() 제거 가능
             targets: &[Some(wgpu::ColorTargetState {
                 format: color_format,
                 blend: Some(wgpu::BlendState {
@@ -162,11 +162,11 @@ fn create_render_pipeline(
             strip_index_format: None,
             front_face: wgpu::FrontFace::Ccw,
             cull_mode: Some(wgpu::Face::Back),
-            // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
+            // Fill 이외의 값을 설정하려면 Features::NON_FILL_POLYGON_MODE가 필요합니다.
             polygon_mode: wgpu::PolygonMode::Fill,
-            // Requires Features::DEPTH_CLIP_CONTROL
+            // Features::DEPTH_CLIP_CONTROL가 필요합니다.
             unclipped_depth: false,
-            // Requires Features::CONSERVATIVE_RASTERIZATION
+            // Features::CONSERVATIVE_RASTERIZATION이 필요합니다.
             conservative: false,
         },
         depth_stencil: depth_format.map(|format| wgpu::DepthStencilState {
@@ -186,7 +186,7 @@ fn create_render_pipeline(
 }
 ```
 
-We also need to change `State::new()` to use this function.
+또한 `State::new()`가 이 함수를 사용하도록 변경해야 합니다.
 
 ```rust
 let render_pipeline = {
@@ -205,7 +205,7 @@ let render_pipeline = {
 };
 ```
 
-We're going to need to modify `model::DrawModel` to use our `light_bind_group`.
+`model::DrawModel`이 `light_bind_group`을 사용하도록 수정해야 합니다.
 
 ```rust
 // model.rs
@@ -295,7 +295,7 @@ where
 }
 ```
 
-With that done, we can create another render pipeline for our light.
+이 작업이 끝나면 빛을 위한 또 다른 렌더 파이프라인을 만들 수 있습니다.
 
 ```rust
 // lib.rs
@@ -320,13 +320,13 @@ let light_render_pipeline = {
 };
 ```
 
-I chose to create a separate layout for the `light_render_pipeline`, as it doesn't need all the resources that the regular `render_pipeline` needs (mainly just the textures).
+저는 `light_render_pipeline`을 위해 별도의 레이아웃을 만들었습니다. 이 파이프라인은 일반 `render_pipeline`이 필요로 하는 모든 리소스(주로 텍스처)가 필요 없기 때문입니다.
 
-With that in place, we need to write the actual shaders.
+이것이 준비되면, 실제 셰이더를 작성해야 합니다.
 
 ```wgsl
 // light.wgsl
-// Vertex shader
+// 정점 셰이더
 
 struct Camera {
     view_proj: mat4x4<f32>,
@@ -361,7 +361,7 @@ fn vs_main(
     return out;
 }
 
-// Fragment shader
+// 프래그먼트 셰이더
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
@@ -369,7 +369,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 }
 ```
 
-Now, we could manually implement the draw code for the light in `render()`, but to keep with the pattern we developed, let's create a new trait called `DrawLight`.
+이제 `render()`에서 빛을 그리는 코드를 직접 구현할 수도 있지만, 우리가 개발한 패턴을 유지하기 위해 `DrawLight`라는 새 트레이트를 만들겠습니다.
 
 ```rust
 // model.rs
@@ -452,7 +452,7 @@ where
 }
 ```
 
-Finally, we want to add Light rendering to our render passes.
+마지막으로, 렌더 패스에 빛 렌더링을 추가하고 싶습니다.
 
 ```rust
 impl State {
@@ -460,34 +460,40 @@ impl State {
    fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         // ...
         render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
-
-        use crate::model::DrawLight; // NEW!
-        render_pass.set_pipeline(&self.light_render_pipeline); // NEW!
+        
+        // 드로잉 트레이트를 사용합니다.
+        use crate::model::{DrawModel, DrawLight}; // DrawLight 추가!
+        
+        // 빛을 먼저 그립니다.
+        render_pass.set_pipeline(&self.light_render_pipeline); // 새로운 내용!
         render_pass.draw_light_model(
             &self.obj_model,
             &self.camera_bind_group,
             &self.light_bind_group,
-        ); // NEW!
+        ); // 새로운 내용!
 
+        // 그 다음 객체를 그립니다.
         render_pass.set_pipeline(&self.render_pipeline);
         render_pass.draw_model_instanced(
             &self.obj_model,
             0..self.instances.len() as u32,
             &self.camera_bind_group,
-            &self.light_bind_group, // NEW
+            &self.light_bind_group, // 새로운 내용!
         );
+        // ...
+    }
 }
 ```
 
-With all that, we'll end up with something like this.
+이 모든 것을 마치면 다음과 같은 결과물을 얻게 될 것입니다.
 
 ![./light-in-scene.png](./light-in-scene.png)
 
-## Ambient Lighting
+## 주변광 (Ambient Lighting)
 
-Light has a tendency to bounce around before entering our eyes. That's why you can see in areas that are in shadow. Modeling this interaction would be computationally expensive, so we will cheat. We define an ambient lighting value for the light bouncing off other parts of the scene to light our objects.
+빛은 우리 눈에 들어오기 전에 주변에서 반사되는 경향이 있습니다. 그림자가 진 곳도 볼 수 있는 이유가 바로 이것입니다. 이 상호작용을 모델링하는 것은 계산 비용이 많이 들기 때문에, 우리는 속임수를 쓸 것입니다. 장면의 다른 부분에서 반사된 빛이 우리 객체를 비추는 것에 대한 주변광 값을 정의합니다.
 
-The ambient part is based on the light color and the object color. We've already added our `light_bind_group`, so we just need to use it in our shader. In `shader.wgsl`, add the following below the texture uniforms.
+주변광 부분은 빛의 색과 객체의 색을 기반으로 합니다. 우리는 이미 `light_bind_group`을 추가했으므로, 셰이더에서 사용하기만 하면 됩니다. `shader.wgsl`에서 텍스처 유니폼 아래에 다음을 추가하세요.
 
 ```wgsl
 struct Light {
@@ -498,14 +504,14 @@ struct Light {
 var<uniform> light: Light;
 ```
 
-Then, we need to update our main shader code to calculate and use the ambient color value.
+그런 다음, 주변광 색상 값을 계산하고 사용하도록 메인 셰이더 코드를 업데이트해야 합니다.
 
 ```wgsl
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let object_color: vec4<f32> = textureSample(t_diffuse, s_diffuse, in.tex_coords);
     
-    // We don't need (or want) much ambient light, so 0.1 is fine
+    // 주변광은 많이 필요 없으므로 0.1이면 충분합니다.
     let ambient_strength = 0.1;
     let ambient_color = light.color * ambient_strength;
 
@@ -515,29 +521,29 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 }
 ```
 
-With that, we should get something like this.
+그러면 다음과 같은 결과물을 얻게 될 것입니다.
 
 ![./ambient_lighting.png](./ambient_lighting.png)
 
-## Diffuse Lighting
+## 난반사광 (Diffuse Lighting)
 
-Remember the normal vectors that were included in our model? We're finally going to use them. Normals represent the direction a surface is facing. By comparing the normal of a fragment with a vector pointing to a light source, we get a value of how light/dark that fragment should be. We compare the vectors using the dot product to get the cosine of the angle between them.
+우리 모델에 포함되었던 법선 벡터(normal vector)를 기억하시나요? 드디어 그것들을 사용할 것입니다. 법선은 표면이 향하는 방향을 나타냅니다. 프래그먼트의 법선과 광원을 가리키는 벡터를 비교하여 해당 프래그먼트가 얼마나 밝거나 어두워야 하는지에 대한 값을 얻습니다. 두 벡터를 내적(dot product)하여 그들 사이의 각도의 코사인 값을 얻습니다.
 
 ![./normal_diagram.png](./normal_diagram.png)
 
-If the dot product of the normal and light vector is 1.0, that means that the current fragment is directly in line with the light source and will receive the light's full intensity. A value of 0.0 or lower means that the surface is perpendicular or facing away from the light and, therefore, will be dark.
+법선과 빛 벡터의 내적이 1.0이면, 현재 프래그먼트가 광원과 직접 일직선상에 있어 빛의 최대 강도를 받는다는 의미입니다. 값이 0.0 이하면 표면이 빛에 수직이거나 등을 돌리고 있어 어둡다는 의미입니다.
 
-We're going to need to pull in the normal vector into our `shader.wgsl`.
+이제 `shader.wgsl`에 법선 벡터를 가져와야 합니다.
 
 ```wgsl
 struct VertexInput {
     @location(0) position: vec3<f32>,
     @location(1) tex_coords: vec2<f32>,
-    @location(2) normal: vec3<f32>, // NEW!
+    @location(2) normal: vec3<f32>, // 새로운 내용!
 };
 ```
 
-We're also going to want to pass that value, as well as the vertex's position, to the fragment shader.
+또한 그 값과 정점의 위치를 프래그먼트 셰이더로 전달하고 싶을 것입니다.
 
 ```wgsl
 struct VertexOutput {
@@ -548,7 +554,7 @@ struct VertexOutput {
 };
 ```
 
-For now, let's just pass the normal directly as-is. This is wrong, but we'll fix it later.
+지금은 법선을 그대로 전달하겠습니다. 이것은 잘못된 방법이지만, 나중에 수정할 것입니다.
 
 ```wgsl
 @vertex
@@ -565,14 +571,14 @@ fn vs_main(
     var out: VertexOutput;
     out.tex_coords = model.tex_coords;
     out.world_normal = model.normal;
-    var world_position: vec4<f32> = model_matrix * vec4<f32>(model.position, 1.0);
+    let world_position: vec4<f32> = model_matrix * vec4<f32>(model.position, 1.0);
     out.world_position = world_position.xyz;
     out.clip_position = camera.view_proj * world_position;
     return out;
 }
 ```
 
-With that, we can do the actual calculation. Add the following below the `ambient_color` calculation but above the `result`.
+이제 실제 계산을 할 수 있습니다. `ambient_color` 계산 아래, `result` 위에 다음을 추가하세요.
 
 ```wgsl
 let light_dir = normalize(light.position - in.world_position);
@@ -581,50 +587,50 @@ let diffuse_strength = max(dot(in.world_normal, light_dir), 0.0);
 let diffuse_color = light.color * diffuse_strength;
 ```
 
-Now we can include the `diffuse_color` in the `result`.
+이제 `result`에 `diffuse_color`를 포함시킬 수 있습니다.
 
 ```wgsl
 let result = (ambient_color + diffuse_color) * object_color.xyz;
 ```
 
-With that, we get something like this.
+그러면 다음과 같은 결과물을 얻게 됩니다.
 
 ![./ambient_diffuse_wrong.png](./ambient_diffuse_wrong.png)
 
-## The normal matrix
+## 법선 행렬 (The normal matrix)
 
-Remember when I said passing the vertex normal directly to the fragment shader was wrong? Let's explore that by removing all the cubes from the scene except one that will be rotated 180 degrees on the y-axis.
+정점 법선을 프래그먼트 셰이더로 직접 전달하는 것이 잘못되었다고 말했던 것을 기억하시나요? y축으로 180도 회전된 큐브 하나만 남기고 장면에서 모든 큐브를 제거하여 이를 탐구해 봅시다.
 
 ```rust
 const NUM_INSTANCES_PER_ROW: u32 = 1;
 
-// In the loop, we create the instances in
+// 인스턴스를 생성하는 루프 안에서
 let rotation = cgmath::Quaternion::from_axis_angle((0.0, 1.0, 0.0).into(), cgmath::Deg(180.0));
 ```
 
-We'll also remove the `ambient_color` from our lighting `result`.
+또한 조명 `result`에서 `ambient_color`를 제거할 것입니다.
 
 ```wgsl
 let result = (diffuse_color) * object_color.xyz;
 ```
 
-That should give us something that looks like this.
+그러면 다음과 같이 보일 것입니다.
 
 ![./diffuse_wrong.png](./diffuse_wrong.png)
 
-This is clearly wrong, as the light is illuminating the wrong side of the cube. This is because we aren't rotating our normals with our object, so no matter what direction the object faces, the normals will always face the same way.
+빛이 큐브의 잘못된 면을 비추고 있으므로 이는 명백히 잘못되었습니다. 이는 법선을 객체와 함께 회전시키지 않았기 때문입니다. 객체가 어떤 방향을 향하든 법선은 항상 같은 방향을 향하게 됩니다.
 
 ![./normal_not_rotated.png](./normal_not_rotated.png)
 
-We need to use the model matrix to transform the normals to be in the right direction. We only want the rotation data, though. A normal represents a direction and should be a unit vector throughout the calculation. We can get our normals in the right direction using what is called a normal matrix.
+법선을 올바른 방향으로 변환하기 위해 모델 행렬을 사용해야 합니다. 하지만 회전 데이터만 원합니다. 법선은 방향을 나타내며 계산 내내 단위 벡터여야 합니다. 법선 행렬(normal matrix)이라는 것을 사용하여 법선을 올바른 방향으로 만들 수 있습니다.
 
-We could compute the normal matrix in the vertex shader, but that would involve inverting the `model_matrix`, and WGSL doesn't actually have an inverse function. We would have to code our own. On top of that, computing the inverse of a matrix is actually really expensive, especially doing that computation for every vertex.
+정점 셰이더에서 법선 행렬을 계산할 수도 있지만, 이는 `model_matrix`를 역행렬로 만들어야 하고 WGSL에는 실제로 역행렬 함수가 없습니다. 우리 스스로 코드를 짜야 합니다. 게다가 행렬의 역행렬을 계산하는 것은 특히 모든 정점에 대해 그 계산을 수행하는 것은 매우 비용이 많이 듭니다.
 
-Instead, we're going to add a `normal` matrix field to `InstanceRaw`. Instead of inverting the model matrix, we'll just use the instance's rotation to create a `Matrix3`.
+대신, `InstanceRaw`에 `normal` 행렬 필드를 추가할 것입니다. 모델 행렬을 역행렬로 만드는 대신, 인스턴스의 회전을 사용하여 `Matrix3`를 만들 것입니다.
 
 <div class="note">
 
-We are using `Matrix3` instead of `Matrix4` as we only really need the rotation component of the matrix.
+행렬의 회전 성분만 필요하므로 `Matrix4` 대신 `Matrix3`를 사용하고 있습니다.
 
 </div>
 
@@ -637,25 +643,25 @@ struct InstanceRaw {
     normal: [[f32; 3]; 3],
 }
 
-impl model::Vertex for InstanceRaw {
+impl InstanceRaw { // `model::Vertex` 트레이트 구현을 직접 impl 블록으로 변경
     fn desc() -> wgpu::VertexBufferLayout<'static> {
         use std::mem;
         wgpu::VertexBufferLayout {
             array_stride: mem::size_of::<InstanceRaw>() as wgpu::BufferAddress,
-            // We need to switch from using a step mode of Vertex to Instance
-            // This means that our shaders will only change to use the next
-            // instance when the shader starts processing a new instance
+            // Vertex의 step mode에서 Instance로 전환해야 합니다.
+            // 이는 셰이더가 새 인스턴스 처리를 시작할 때만
+            // 다음 인스턴스를 사용하도록 변경됨을 의미합니다.
             step_mode: wgpu::VertexStepMode::Instance,
             attributes: &[
                 wgpu::VertexAttribute {
                     offset: 0,
-                    // While our vertex shader only uses locations 0, and 1 now, in later tutorials, we'll
-                    // be using 2, 3, and 4 for Vertex. We'll start at slot 5 to not conflict with them later
+                    // 정점 셰이더는 이제 location 0과 1만 사용하지만, 나중 튜토리얼에서는
+                    // Vertex에 2, 3, 4를 사용할 것입니다. 나중에 충돌하지 않도록 슬롯 5에서 시작하겠습니다.
                     shader_location: 5,
                     format: wgpu::VertexFormat::Float32x4,
                 },
-                // A mat4 takes up 4 vertex slots as it is technically 4 vec4s. We need to define a slot
-                // for each vec4. We don't have to do this in code, though.
+                // mat4는 기술적으로 4개의 vec4이므로 4개의 정점 슬롯을 차지합니다.
+                // 각 vec4에 대해 슬롯을 정의해야 합니다. 코드에서 이를 직접 할 필요는 없습니다.
                 wgpu::VertexAttribute {
                     offset: mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
                     shader_location: 6,
@@ -671,7 +677,7 @@ impl model::Vertex for InstanceRaw {
                     shader_location: 8,
                     format: wgpu::VertexFormat::Float32x4,
                 },
-                // NEW!
+                // 새로운 내용!
                 wgpu::VertexAttribute {
                     offset: mem::size_of::<[f32; 16]>() as wgpu::BufferAddress,
                     shader_location: 9,
@@ -693,7 +699,7 @@ impl model::Vertex for InstanceRaw {
 }
 ```
 
-We need to modify `Instance` to create the normal matrix.
+법선 행렬을 생성하도록 `Instance`를 수정해야 합니다.
 
 ```rust
 struct Instance {
@@ -707,14 +713,14 @@ impl Instance {
             cgmath::Matrix4::from_translation(self.position) * cgmath::Matrix4::from(self.rotation);
         InstanceRaw {
             model: model.into(),
-            // NEW!
+            // 새로운 내용!
             normal: cgmath::Matrix3::from(self.rotation).into(),
         }
     }
 }
 ```
 
-Now, we need to reconstruct the normal matrix in the vertex shader.
+이제 정점 셰이더에서 법선 행렬을 재구성해야 합니다.
 
 ```wgsl
 struct InstanceInput {
@@ -722,7 +728,7 @@ struct InstanceInput {
     @location(6) model_matrix_1: vec4<f32>,
     @location(7) model_matrix_2: vec4<f32>,
     @location(8) model_matrix_3: vec4<f32>,
-    // NEW!
+    // 새로운 내용!
     @location(9) normal_matrix_0: vec3<f32>,
     @location(10) normal_matrix_1: vec3<f32>,
     @location(11) normal_matrix_2: vec3<f32>,
@@ -746,7 +752,7 @@ fn vs_main(
         instance.model_matrix_2,
         instance.model_matrix_3,
     );
-    // NEW!
+    // 새로운 내용!
     let normal_matrix = mat3x3<f32>(
         instance.normal_matrix_0,
         instance.normal_matrix_1,
@@ -754,8 +760,8 @@ fn vs_main(
     );
     var out: VertexOutput;
     out.tex_coords = model.tex_coords;
-    out.world_normal = normal_matrix * model.normal; // UPDATED!
-    var world_position: vec4<f32> = model_matrix * vec4<f32>(model.position, 1.0);
+    out.world_normal = normal_matrix * model.normal; // 수정된 내용!
+    let world_position: vec4<f32> = model_matrix * vec4<f32>(model.position, 1.0);
     out.world_position = world_position.xyz;
     out.clip_position = camera.view_proj * world_position;
     return out;
@@ -764,43 +770,43 @@ fn vs_main(
 
 <div class="note">
 
-I'm currently doing things in [world space](https://gamedev.stackexchange.com/questions/65783/what-are-world-space-and-eye-space-in-game-development). Doing things in view-space, also known as eye-space, is more standard as objects can have lighting issues when they are further away from the origin. If we wanted to use view-space, we would have included the rotation due to the view matrix as well. We'd also have to transform our light's position using something like `view_matrix * model_matrix * light_position` to keep the calculation from getting messed up when the camera moves.
+저는 현재 [월드 공간(world space)](https://gamedev.stackexchange.com/questions/65783/what-are-world-space-and-eye-space-in-game-development)에서 작업을 하고 있습니다. 뷰 공간(view-space), 즉 시야 공간(eye-space)에서 작업하는 것이 더 표준적입니다. 객체가 원점에서 멀어질수록 조명 문제가 발생할 수 있기 때문입니다. 뷰 공간을 사용하려면 뷰 행렬로 인한 회전도 포함해야 합니다. 또한 카메라가 움직일 때 계산이 틀어지는 것을 막기 위해 `view_matrix * model_matrix * light_position`과 같은 방식으로 빛의 위치도 변환해야 합니다.
 
-There are advantages to using view space. The main one is that when you have massive worlds doing lighting and other calculations in model spacing, it can cause issues as floating-point precision degrades when numbers get really large. View space keeps the camera at the origin meaning all calculations will be using smaller numbers. The actual lighting math ends up the same, but it does require a bit more setup.
+뷰 공간을 사용하면 장점이 있습니다. 가장 큰 장점은 거대한 월드가 있을 때 모델 공간에서 조명 및 기타 계산을 수행하면 부동 소수점 정밀도가 큰 숫자에서 저하되어 문제가 발생할 수 있다는 것입니다. 뷰 공간은 카메라를 원점에 유지하여 모든 계산이 더 작은 숫자를 사용하게 합니다. 실제 조명 수학은 동일하게 유지되지만, 설정이 조금 더 필요합니다.
 
 </div>
 
-With that change, our lighting now looks correct.
+이 변경으로 이제 조명이 올바르게 보입니다.
 
 ![./diffuse_right.png](./diffuse_right.png)
 
-Bringing back our other objects and adding the ambient lighting gives us this.
+다른 객체들을 다시 가져오고 주변광을 추가하면 다음과 같습니다.
 
-![./ambient_diffuse_lighting.png](./ambient_diffuse_lighting.png);
+![./ambient_diffuse_lighting.png](./ambient_diffuse_lighting.png)
 
 <div class="note">
 
-If you can guarantee that your model matrix will always apply uniform scaling to your objects, you can get away with just using the model matrix. Github user @julhe shared this code with me that does the trick:
+모델 행렬이 항상 객체에 균일한 스케일링(uniform scaling)을 적용한다고 보장할 수 있다면, 모델 행렬만 사용해도 괜찮습니다. Github 사용자 @julhe가 저에게 이 트릭을 알려주었습니다.
 
 ```wgsl
 out.world_normal = (model_matrix * vec4<f32>(model.normal, 0.0)).xyz;
 ```
 
-This works by exploiting the fact that by multiplying a 4x4 matrix by a vector with 0 in the w component, only the rotation and scaling will be applied to the vector. You'll need to normalize this vector, though, as normals need to be unit length for the calculations to work.
+이는 4x4 행렬에 w 성분이 0인 벡터를 곱하면 회전과 스케일링만 벡터에 적용된다는 사실을 이용합니다. 하지만 법선은 계산이 작동하려면 단위 길이여야 하므로 이 벡터를 정규화해야 합니다.
 
-The scaling factor *needs* to be uniform in order for this to work. If it's not, the resulting normal will be skewed, as you can see in the following image.
+이 방법이 작동하려면 스케일링 인자가 반드시 균일해야 합니다. 그렇지 않으면 다음 이미지에서 볼 수 있듯이 결과 법선이 왜곡됩니다.
 
 ![./normal-scale-issue.png](./normal-scale-issue.png)
 
 </div>
 
-## Specular Lighting
+## 정반사광 (Specular Lighting)
 
-Specular lighting describes the highlights that appear on objects when viewed from certain angles. If you've ever looked at a car, it's the super bright parts. Basically, some of the light can reflect off the surface like a mirror. The location of the highlight shifts depending on what angle you view it at.
+정반사광은 특정 각도에서 볼 때 객체에 나타나는 하이라이트를 설명합니다. 자동차를 본 적이 있다면, 매우 밝게 빛나는 부분입니다. 기본적으로 일부 빛이 거울처럼 표면에서 반사될 수 있습니다. 하이라이트의 위치는 보는 각도에 따라 달라집니다.
 
 ![./specular_diagram.png](./specular_diagram.png)
 
-Because this is relative to the view angle, we are going to need to pass in the camera's position both into the fragment shader and into the vertex shader.
+이것은 시야각에 상대적이기 때문에, 카메라의 위치를 프래그먼트 셰이더와 정점 셰이더 모두에 전달해야 합니다.
 
 ```wgsl
 struct Camera {
@@ -813,11 +819,11 @@ var<uniform> camera: Camera;
 
 <div class="note">
 
-Don't forget to update the `Camera` struct in `light.wgsl` as well, as if it doesn't match the `CameraUniform` struct in rust, the light will render wrong.
+`light.wgsl`의 `Camera` 구조체도 업데이트하는 것을 잊지 마세요. Rust의 `CameraUniform` 구조체와 일치하지 않으면 빛이 잘못 렌더링됩니다.
 
 </div>
 
-We're going to need to update the `CameraUniform` struct as well.
+`CameraUniform` 구조체도 업데이트해야 합니다.
 
 ```rust
 // lib.rs
@@ -836,64 +842,68 @@ impl CameraUniform {
         }
     }
 
-    fn update_view_proj(&mut self, camera: &Camera) {
-        // We're using Vector4 because of the uniforms 16 byte spacing requirement
-        self.view_position = camera.eye.to_homogeneous().into();
-        self.view_proj = (OPENGL_TO_WGPU_MATRIX * camera.build_view_projection_matrix()).into();
+    fn update_view_proj(&mut self, camera: &Camera, proj: &Projection) { // proj 추가
+        // 유니폼의 16바이트 간격 요구사항 때문에 Vector4를 사용합니다.
+        self.view_position = camera.position.to_homogeneous().into();
+        self.view_proj = (proj.calc_matrix() * camera.calc_matrix()).into();
     }
 }
 ```
 
-Since we want to use our uniforms in the fragment shader now, we need to change its visibility.
+이제 프래그먼트 셰이더에서 유니폼을 사용하고 싶으므로, 가시성을 변경해야 합니다.
 
 ```rust
 // lib.rs
 let camera_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
     entries: &[
-        wgpu::BindGroupLayoutBinding {
-            // ...
-            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT, // Updated!
-            // ...
+        wgpu::BindGroupLayoutEntry { // wgpu::BindGroupLayoutBinding -> wgpu::BindGroupLayoutEntry
+            binding: 0,
+            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT, // 수정됨!
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            count: None,
         },
-        // ...
     ],
-    label: None,
+    label: Some("camera_bind_group_layout"), // 레이블 추가
 });
 ```
 
-We're going to get the direction from the fragment's position to the camera and use that with the normal to calculate the `reflect_dir`.
+프래그먼트 위치에서 카메라까지의 방향을 얻고 그것을 법선과 함께 사용하여 `reflect_dir`을 계산할 것입니다.
 
 ```wgsl
 // shader.wgsl
-// In the fragment shader...
+// 프래그먼트 셰이더 안에서...
 let view_dir = normalize(camera.view_pos.xyz - in.world_position);
 let reflect_dir = reflect(-light_dir, in.world_normal);
 ```
 
-Then, we use the dot product to calculate the `specular_strength` and use that to compute the `specular_color`.
+그런 다음, 내적을 사용하여 `specular_strength`를 계산하고 그것을 사용하여 `specular_color`를 계산합니다.
 
 ```wgsl
 let specular_strength = pow(max(dot(view_dir, reflect_dir), 0.0), 32.0);
 let specular_color = specular_strength * light.color;
 ```
 
-Finally, we add that to the result.
+마지막으로 결과에 그것을 더합니다.
 
 ```wgsl
 let result = (ambient_color + diffuse_color + specular_color) * object_color.xyz;
 ```
 
-With that, you should have something like this.
+그러면 다음과 같은 결과물을 얻게 될 것입니다.
 
 ![./ambient_diffuse_specular_lighting.png](./ambient_diffuse_specular_lighting.png)
 
-If we just look at the `specular_color` on its own, we get this.
+`specular_color`만 따로 보면 다음과 같습니다.
 
 ![./specular_lighting.png](./specular_lighting.png)
 
-## The half direction
+## 하프 디렉션 (The half direction)
 
-Up to this point, we've actually only implemented the Phong part of Blinn-Phong. The Phong reflection model works well, but it can break down under [certain circumstances](https://learnopengl.com/Advanced-Lighting/Advanced-Lighting). The Blinn part of Blinn-Phong comes from the realization that if you add the `view_dir` and `light_dir` together, normalize the result and use the dot product of that and the `normal`, you get roughly the same results without the issues that using `reflect_dir` had.
+지금까지 우리는 실제로 블린-퐁의 퐁 부분만 구현했습니다. 퐁 반사 모델은 잘 작동하지만, [특정 상황에서는](https://learnopengl.com/Advanced-Lighting/Advanced-Lighting) 문제가 발생할 수 있습니다. 블린-퐁의 블린 부분은 `view_dir`과 `light_dir`을 더하고 그 결과를 정규화한 다음, 그것과 `normal`의 내적을 사용하면 `reflect_dir`을 사용할 때 발생했던 문제 없이 거의 동일한 결과를 얻을 수 있다는 깨달음에서 비롯됩니다.
 
 ```wgsl
 let view_dir = normalize(camera.view_pos.xyz - in.world_position);
@@ -902,11 +912,11 @@ let half_dir = normalize(view_dir + light_dir);
 let specular_strength = pow(max(dot(in.world_normal, half_dir), 0.0), 32.0);
 ```
 
-It's hard to tell the difference, but here are the results.
+차이를 구별하기는 어렵지만, 결과는 다음과 같습니다.
 
 ![./half_dir.png](./half_dir.png)
 
-## Demo
+## 데모
 
 <WasmExample example="tutorial10_lighting"></WasmExample>
 

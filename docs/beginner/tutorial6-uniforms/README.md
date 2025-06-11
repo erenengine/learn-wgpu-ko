@@ -1,10 +1,10 @@
-# Uniform buffers and a 3d camera
+# 유니폼 버퍼와 3D 카메라
 
-While all of our previous work has seemed to be in 2D, we've actually been working in 3d the entire time! That's part of the reason why our `Vertex` structure has `position` as an array of 3 floats instead of just 2. We can't really see the 3d-ness of our scene because we're viewing things head-on. We're going to change our point of view by creating a `Camera`.
+이전의 모든 작업이 2D처럼 보였지만, 사실 우리는 계속 3D 환경에서 작업해 왔습니다! 저희의 `Vertex` 구조체에서 `position`이 2개가 아닌 3개의 `f32` 배열인 이유도 바로 그 때문입니다. 지금까지는 장면을 정면에서 바라보고 있었기 때문에 3D 공간감을 제대로 느낄 수 없었습니다. 이제 `Camera`를 만들어 시점을 바꿔보겠습니다.
 
-## A perspective camera
+## 원근 카메라 (A perspective camera)
 
-This tutorial is more about learning to use wgpu and less about linear algebra, so I'm going to gloss over a lot of the math involved. There's plenty of reading material online if you're interested in what's going on under the hood. We're going to use the [cgmath](https://docs.rs/cgmath) to handle all the math for us. Add the following to your `Cargo.toml`.
+이 튜토리얼은 선형대수학보다는 wgpu 사용법을 배우는 데 더 중점을 두므로, 관련된 많은 수학적 내용은 간략하게 넘어가겠습니다. 내부 동작 원리에 관심이 있다면 온라인에서 많은 자료를 찾아보실 수 있습니다. 저희는 [cgmath](https://docs.rs/cgmath)를 사용해 모든 수학 계산을 처리할 것입니다. `Cargo.toml`에 다음 의존성을 추가하세요.
 
 ```toml
 [dependencies]
@@ -12,7 +12,7 @@ This tutorial is more about learning to use wgpu and less about linear algebra, 
 cgmath = "0.18"
 ```
 
-Now that we have a math library let's put it to use! Create a `Camera` struct above the `State` struct.
+이제 수학 라이브러리가 생겼으니 사용해 봅시다! `State` 구조체 위에 `Camera` 구조체를 만드세요.
 
 ```rust
 struct Camera {
@@ -38,10 +38,10 @@ impl Camera {
 }
 ```
 
-The `build_view_projection_matrix` is where the magic happens.
-1. The `view` matrix moves the world to be at the position and rotation of the camera. It's essentially an inverse of whatever the transform matrix of the camera would be.
-2. The `proj` matrix warps the scene to give the effect of depth. Without this, objects up close would be the same size as objects far away.
-3. The coordinate system in Wgpu is based on DirectX and Metal's coordinate systems. That means that in [normalized device coordinates](https://github.com/gfx-rs/gfx/tree/master/src/backend/dx12#normalized-coordinates), the x-axis and y-axis are in the range of -1.0 to +1.0, and the z-axis is 0.0 to +1.0. The `cgmath` crate (as well as most game math crates) is built for OpenGL's coordinate system. This matrix will scale and translate our scene from OpenGL's coordinate system to WGPU's. We'll define it as follows.
+`build_view_projection_matrix` 함수에서 마법이 일어납니다.
+1. `view` 행렬은 월드(world)를 카메라의 위치와 회전에 맞게 이동시킵니다. 본질적으로 이는 카메라의 변환 행렬(transform matrix)을 반대로 적용한 것과 같습니다.
+2. `proj` 행렬은 장면을 왜곡하여 깊이감을 주는 효과를 냅니다. 이 행렬이 없으면 가까이 있는 물체와 멀리 있는 물체가 같은 크기로 보일 것입니다.
+3. Wgpu의 좌표계는 DirectX와 Metal의 좌표계를 기반으로 합니다. 이는 [정규화된 디바이스 좌표계](https://github.com/gfx-rs/gfx/tree/master/src/backend/dx12#normalized-coordinates)(normalized device coordinates)에서 x축과 y축은 -1.0에서 +1.0 범위, z축은 0.0에서 +1.0 범위라는 것을 의미합니다. `cgmath` 크레이트(대부분의 게임 수학 라이브러리와 마찬가지로)는 OpenGL의 좌표계를 기준으로 만들어졌습니다. 아래 행렬은 OpenGL 좌표계의 장면을 WGPU의 좌표계로 스케일링하고 변환하는 역할을 합니다. 다음과 같이 정의하겠습니다.
 
 ```rust
 #[rustfmt::skip]
@@ -53,9 +53,9 @@ pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::from_co
 );
 ```
 
-* Note: We don't explicitly **need** the `OPENGL_TO_WGPU_MATRIX`, but models centered on (0, 0, 0) will be halfway inside the clipping area. This is only an issue if you aren't using a camera matrix.
+*   참고: `OPENGL_TO_WGPU_MATRIX`가 반드시 **필요한** 것은 아니지만, 이 행렬을 사용하지 않으면 (0, 0, 0)에 중심을 둔 모델들이 클리핑 영역의 절반 안쪽에 위치하게 됩니다. 이는 카메라 행렬을 사용하지 않을 경우에만 문제가 됩니다.
 
-Now let's add a `camera` field to `State`.
+이제 `State`에 `camera` 필드를 추가합시다.
 
 ```rust
 pub struct State {
@@ -68,12 +68,12 @@ async fn new(window: Window) -> Self {
     // let diffuse_bind_group ...
 
     let camera = Camera {
-        // position the camera 1 unit up and 2 units back
-        // +z is out of the screen
+        // 카메라를 위로 1 유닛, 뒤로 2 유닛 이동
+        // +z는 화면 바깥쪽 방향입니다
         eye: (0.0, 1.0, 2.0).into(),
-        // have it look at the origin
+        // 원점을 바라보게 함
         target: (0.0, 0.0, 0.0).into(),
-        // which way is "up"
+        // "위" 방향을 정의
         up: cgmath::Vector3::unit_y(),
         aspect: config.width as f32 / config.height as f32,
         fovy: 45.0,
@@ -89,20 +89,20 @@ async fn new(window: Window) -> Self {
 }
 ```
 
-Now that we have our camera, and it can make us a view projection matrix, we need somewhere to put it. We also need some way of getting it into our shaders.
+이제 카메라가 생겼고, 뷰-투영 행렬(view projection matrix)을 만들 수 있게 되었으니, 이 행렬을 어딘가에 저장해야 합니다. 또한, 이 데이터를 셰이더로 전달할 방법도 필요합니다.
 
-## The uniform buffer
+## 유니폼 버퍼 (The uniform buffer)
 
-Up to this point, we've used `Buffer`s to store our vertex and index data, and even to load our textures. We are going to use them again to create what's known as a uniform buffer. A uniform is a blob of data available to every invocation of a set of shaders. Technically, we've already used uniforms for our texture and sampler. We're going to use them again to store our view projection matrix. To start, let's create a struct to hold our uniform.
+지금까지 우리는 정점(vertex)과 인덱스(index) 데이터를 저장하고 텍스처를 로드하기 위해 `Buffer`를 사용했습니다. 이제 다시 버퍼를 사용하여 유니폼 버퍼(uniform buffer)라는 것을 만들 것입니다. 유니폼(uniform)은 셰이더의 모든 호출에서 사용할 수 있는 데이터 덩어리입니다. 사실, 우리는 이미 텍스처와 샘플러에 유니폼을 사용했습니다. 이번에는 뷰-투영 행렬을 저장하기 위해 유니폼을 다시 사용할 것입니다. 먼저 유니폼을 담을 구조체를 만듭시다.
 
 ```rust
-// We need this for Rust to store our data correctly for the shaders
+// Rust가 셰이더를 위해 데이터를 올바르게 저장하도록 하는 데 필요합니다
 #[repr(C)]
-// This is so we can store this in a buffer
+// 이 구조체를 버퍼에 저장할 수 있도록 합니다
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct CameraUniform {
-    // We can't use cgmath with bytemuck directly, so we'll have
-    // to convert the Matrix4 into a 4x4 f32 array
+    // cgmath를 bytemuck과 직접 사용할 수 없으므로,
+    // Matrix4를 4x4 f32 배열로 변환해야 합니다
     view_proj: [[f32; 4]; 4],
 }
 
@@ -120,10 +120,10 @@ impl CameraUniform {
 }
 ```
 
-Now that we have our data structured, let's make our `camera_buffer`.
+이제 데이터 구조가 준비되었으니, `camera_buffer`를 만들어 봅시다.
 
 ```rust
-// in new() after creating `camera`
+// new() 함수에서 camera를 만든 후
 
 let mut camera_uniform = CameraUniform::new();
 camera_uniform.update_view_proj(&camera);
@@ -137,9 +137,9 @@ let camera_buffer = device.create_buffer_init(
 );
 ```
 
-## Uniform buffers and bind groups
+## 유니폼 버퍼와 바인드 그룹
 
-Cool! Now that we have a uniform buffer, what do we do with it? The answer is we create a bind group for it. First, we have to create the bind group layout.
+좋습니다! 이제 유니폼 버퍼가 생겼으니, 무엇을 해야 할까요? 정답은 바인드 그룹(bind group)을 만드는 것입니다. 먼저, 바인드 그룹 레이아웃을 만들어야 합니다.
 
 ```rust
 let camera_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -159,17 +159,13 @@ let camera_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupL
 });
 ```
 
-Some things to note:
+몇 가지 주목할 점:
 
-1. We set `visibility` to `ShaderStages::VERTEX` as we only really need camera information in the vertex shader, as
-    that's what we'll use to manipulate our vertices.
-2. The `has_dynamic_offset` means that the location of the data in the buffer may change. This will be the case if you
-    store multiple data sets that vary in size in a single buffer. If you set this to true, you'll have to supply the
-    offsets later.
-3. `min_binding_size` specifies the smallest size the buffer can be. You don't have to specify this, so we
-    leave it `None`. If you want to know more, you can check [the docs](https://docs.rs/wgpu/latest/wgpu/enum.BindingType.html#variant.Buffer.field.min_binding_size).
+1.  `visibility`를 `ShaderStages::VERTEX`로 설정했습니다. 정점을 조작하는 데 카메라 정보가 사용되므로, 정점 셰이더에서만 필요하기 때문입니다.
+2.  `has_dynamic_offset`은 버퍼 내 데이터의 위치가 바뀔 수 있음을 의미합니다. 단일 버퍼에 크기가 다른 여러 데이터 세트를 저장하는 경우에 해당합니다. 이 값을 `true`로 설정하면 나중에 오프셋을 제공해야 합니다.
+3.  `min_binding_size`는 버퍼가 가질 수 있는 최소 크기를 지정합니다. 필수로 지정할 필요는 없으므로 `None`으로 둡니다. 더 자세한 정보는 [문서](https://docs.rs/wgpu/latest/wgpu/enum.BindingType.html#variant.Buffer.field.min_binding_size)를 확인하세요.
 
-Now, we can create the actual bind group.
+이제 실제 바인드 그룹을 만들 수 있습니다.
 
 ```rust
 let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -184,7 +180,7 @@ let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
 });
 ```
 
-Like with our texture, we need to register our `camera_bind_group_layout` with the render pipeline.
+텍스처와 마찬가지로, `camera_bind_group_layout`을 렌더 파이프라인에 등록해야 합니다.
 
 ```rust
 let render_pipeline_layout = device.create_pipeline_layout(
@@ -199,7 +195,7 @@ let render_pipeline_layout = device.create_pipeline_layout(
 );
 ```
 
-Now we need to add `camera_buffer` and `camera_bind_group` to `State`
+이제 `camera_buffer`와 `camera_bind_group`을 `State`에 추가해야 합니다.
 
 ```rust
 pub struct State {
@@ -222,7 +218,7 @@ async fn new(window: Window) -> Self {
 }
 ```
 
-The final thing we need to do before we get into shaders is use the bind group in `render()`.
+셰이더 작업을 시작하기 전에 마지막으로 할 일은 `render()`에서 이 바인드 그룹을 사용하는 것입니다.
 
 ```rust
 render_pass.set_pipeline(&self.render_pipeline);
@@ -235,9 +231,9 @@ render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uin
 render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
 ```
 
-## Using the uniform in the vertex shader
+## 정점 셰이더에서 유니폼 사용하기
 
-Modify the vertex shader to include the following.
+정점 셰이더를 다음과 같이 수정하세요.
 
 ```wgsl
 // Vertex shader
@@ -268,16 +264,16 @@ fn vs_main(
 }
 ```
 
-1. Because we've created a new bind group, we need to specify which one we're using in the shader. The number is determined by our `render_pipeline_layout`. The `texture_bind_group_layout` is listed first, thus it's `group(0)`, and `camera_bind_group` is second, so it's `group(1)`.
-2. Multiplication order is important when it comes to matrices. The vector goes on the right, and the matrices go on the left in order of importance.
+1.  새로운 바인드 그룹을 만들었기 때문에, 셰이더에서 어떤 그룹을 사용할지 지정해야 합니다. 이 숫자는 `render_pipeline_layout`에 의해 결정됩니다. `texture_bind_group_layout`이 먼저 나열되었으므로 `group(0)`이고, `camera_bind_group`이 두 번째이므로 `group(1)`입니다.
+2.  행렬 곱셈에서는 순서가 중요합니다. 벡터는 오른쪽에, 행렬은 중요도 순서에 따라 왼쪽에 배치됩니다.
 
-## A controller for our camera
+## 카메라를 위한 컨트롤러
 
-If you run the code right now, you should get something like this.
+지금 코드를 실행하면 다음과 같은 화면이 나타날 것입니다.
 
 ![./static-tree.png](./static-tree.png)
 
-The shape's less stretched now, but it's still pretty static. You can experiment with moving the camera position around, but most cameras in games move around. Since this tutorial is about using wgpu and not how to process user input, I'm just going to post the `CameraController` code below.
+도형이 덜 늘어나 보이지만, 여전히 정적입니다. 카메라 위치를 바꿔가며 실험해 볼 수 있지만, 대부분의 게임에서 카메라는 움직입니다. 이 튜토리얼은 wgpu 사용법에 관한 것이지 사용자 입력 처리에 관한 것이 아니므로, 아래에 `CameraController` 코드를 바로 첨부하겠습니다.
 
 ```rust
 struct CameraController {
@@ -340,8 +336,8 @@ impl CameraController {
         let forward_norm = forward.normalize();
         let forward_mag = forward.magnitude();
 
-        // Prevents glitching when the camera gets too close to the
-        // center of the scene.
+        // 카메라가 장면의 중심에 너무 가까워졌을 때
+        // 발생하는 글리치 현상을 방지합니다.
         if self.is_forward_pressed && forward_mag > self.speed {
             camera.eye += forward_norm * self.speed;
         }
@@ -351,14 +347,13 @@ impl CameraController {
 
         let right = forward_norm.cross(camera.up);
 
-        // Redo radius calc in case the forward/backward is pressed.
+        // 앞/뒤 이동 키가 눌렸을 경우를 대비해 반지름을 다시 계산합니다.
         let forward = camera.target - camera.eye;
         let forward_mag = forward.magnitude();
 
         if self.is_right_pressed {
-            // Rescale the distance between the target and the eye so 
-            // that it doesn't change. The eye, therefore, still 
-            // lies on the circle made by the target and eye.
+            // 타겟과 눈 사이의 거리가 변하지 않도록 재조정합니다.
+            // 따라서 눈은 여전히 타겟과 눈이 만드는 원 위에 놓이게 됩니다.
             camera.eye = camera.target - (forward + right * self.speed).normalize() * forward_mag;
         }
         if self.is_left_pressed {
@@ -368,9 +363,9 @@ impl CameraController {
 }
 ```
 
-This code is not perfect. The camera slowly moves back when you rotate it. It works for our purposes, though. Feel free to improve it!
+이 코드는 완벽하지 않습니다. 회전할 때 카메라가 서서히 뒤로 움직이는 문제가 있습니다. 하지만 이 튜토리얼의 목적에는 충분합니다. 자유롭게 개선해 보세요!
 
-We still need to plug this into our existing code to make it do anything. Add the controller to `State` and create it in `new()`.
+이제 이 코드를 기존 코드에 연결해야 합니다. `State`에 컨트롤러를 추가하고 `new()`에서 생성하세요.
 
 ```rust
 pub struct State {
@@ -396,7 +391,7 @@ impl State {
 }
 ```
 
-We're finally going to add some code to `input()` (assuming you haven't already)!
+드디어 `input()`에 코드를 추가할 시간입니다! (아직 추가하지 않으셨다면)
 
 ```rust
 fn input(&mut self, event: &WindowEvent) -> bool {
@@ -404,12 +399,13 @@ fn input(&mut self, event: &WindowEvent) -> bool {
 }
 ```
 
-Up to this point, the camera controller isn't actually doing anything. The values in our uniform buffer need to be updated. There are a few main methods to do that.
-1. We can create a separate buffer and copy its contents to our `camera_buffer`. The new buffer is known as a staging buffer. This method is usually how it's done as it allows the contents of the main buffer (in this case, `camera_buffer`) to be accessible only by the GPU. The GPU can do some speed optimizations, which it couldn't if we could access the buffer via the CPU.
-2. We can call one of the mapping methods `map_read_async`, and `map_write_async` on the buffer itself. These allow us to access a buffer's contents directly but require us to deal with the `async` aspect of these methods. This also requires our buffer to use the `BufferUsages::MAP_READ` and/or `BufferUsages::MAP_WRITE`. We won't talk about it here, but check out the [Wgpu without a window](../../showcase/windowless) tutorial if you want to know more.
-3. We can use `write_buffer` on `queue`.
+지금까지 카메라 컨트롤러는 실제로 아무것도 하지 않았습니다. 유니폼 버퍼의 값을 업데이트해야 합니다. 이를 위한 몇 가지 주요 방법이 있습니다.
 
-We're going to use option number 3.
+1.  별도의 버퍼를 만들어 그 내용을 `camera_buffer`로 복사하는 방법입니다. 이 새 버퍼를 스테이징 버퍼(staging buffer)라고 합니다. 이 방법은 보통 `camera_buffer`와 같은 주 버퍼의 내용을 GPU만 접근할 수 있게 하므로 일반적으로 사용됩니다. 이를 통해 GPU는 CPU가 버퍼에 접근할 수 있을 때는 불가능한 몇 가지 속도 최적화를 수행할 수 있습니다.
+2.  버퍼 자체에 `map_read_async`나 `map_write_async`와 같은 매핑 메서드를 호출하는 방법입니다. 이를 통해 버퍼의 내용에 직접 접근할 수 있지만, 이러한 메서드의 `async`적인 측면을 다루어야 합니다. 또한 버퍼에 `BufferUsages::MAP_READ`나 `BufferUsages::MAP_WRITE` 사용 플래그가 필요합니다. 여기서는 다루지 않지만, 더 알고 싶다면 [창 없는 Wgpu](../../showcase/windowless) 튜토리얼을 확인하세요.
+3.  `queue`의 `write_buffer`를 사용하는 방법입니다.
+
+우리는 세 번째 방법을 사용할 것입니다.
 
 ```rust
 fn update(&mut self) {
@@ -419,14 +415,14 @@ fn update(&mut self) {
 }
 ```
 
-That's all we need to do. If you run the code now, you should see a pentagon with our tree texture that you can rotate around and zoom into with the wasd/arrow keys.
+이것이 우리가 해야 할 전부입니다. 이제 코드를 실행하면, wasd/화살표 키로 회전하고 확대/축소할 수 있는 나무 텍스처가 입혀진 오각형이 보일 것입니다.
 
-## Demo
+## 데모
 
 <WasmExample example="tutorial6_uniforms"></WasmExample>
 
 <AutoGithubLink/>
 
-## Challenge
+## 도전 과제
 
-Have our model rotate on its own independently of the camera. *Hint: you'll need another matrix for this.*
+카메라와 독립적으로 모델이 스스로 회전하도록 만들어 보세요. *힌트: 이를 위해 또 다른 행렬이 필요할 것입니다.*

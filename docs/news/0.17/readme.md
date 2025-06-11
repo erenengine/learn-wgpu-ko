@@ -1,3 +1,3 @@
-# Update to 0.17
+# 0.17 업데이트
 
-No changes needed to the tutorial!
+튜토리얼에는 변경 사항이 없습니다!

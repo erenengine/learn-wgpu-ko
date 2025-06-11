@@ -1,33 +1,33 @@
-# Normal Mapping
+# 노멀 매핑 (Normal Mapping)
 
-With just lighting, our scene is already looking pretty good. Still, our models are still overly smooth. This is understandable because we are using a very simple model. If we were using a texture that was supposed to be smooth, this wouldn't be a problem, but our brick texture is supposed to be rougher. We could solve this by adding more geometry, but that would slow our scene down, and it would be hard to know where to add new polygons. This is where normal mapping comes in.
+조명만으로도 우리 씬은 이미 꽤 멋져 보입니다. 하지만 모델이 여전히 너무 매끄럽습니다. 이는 우리가 매우 단순한 모델을 사용하고 있기 때문에 당연한 결과입니다. 만약 매끄러워야 할 텍스처를 사용했다면 문제가 되지 않았겠지만, 우리 벽돌 텍스처는 더 거칠어야 합니다. 더 많은 지오메트리(geometry)를 추가하여 이 문제를 해결할 수도 있지만, 이는 씬의 속도를 저하시킬 것이고, 어디에 새로운 폴리곤을 추가해야 할지 알기 어렵습니다. 바로 이 지점에서 노멀 매핑이 등장합니다.
 
-Remember when we experimented with storing instance data in a texture in [the instancing tutorial](/beginner/tutorial7-instancing/#a-different-way-textures)? A normal map is doing just that with normal data! We'll use the normals in the normal map in our lighting calculation in addition to the vertex normal.
+[인스턴싱 튜토리얼](/beginner/tutorial7-instancing/#a-different-way-textures)에서 텍스처에 인스턴스 데이터를 저장하는 실험을 했던 것을 기억하시나요? 노멀 맵은 바로 노멀 데이터를 가지고 그 작업을 하는 것입니다! 우리는 정점 노멀에 더해 노멀 맵에 있는 노멀을 조명 계산에 사용할 것입니다.
 
-The brick texture I found came with a normal map. Let's take a look at it!
+제가 찾은 벽돌 텍스처에는 노멀 맵이 함께 제공되었습니다. 한번 살펴봅시다!
 
 ![./cube-normal.png](./cube-normal.png)
 
-The r, g, and b components of the texture correspond to the x, y, and z components or the normals. All the z values should be positive. That's why the normal map has a bluish tint.
+텍스처의 r, g, b 요소는 각각 노멀의 x, y, z 요소에 해당합니다. 모든 z 값은 양수여야 합니다. 이것이 노멀 맵이 푸른빛을 띠는 이유입니다.
 
-We'll need to modify our `Material` struct in `model.rs` to include a `normal_texture`.
+`model.rs` 파일의 `Material` 구조체를 수정하여 `normal_texture`를 포함해야 합니다.
 
 ```rust
 pub struct Material {
     pub name: String,
     pub diffuse_texture: texture::Texture,
-    pub normal_texture: texture::Texture, // UPDATED!
+    pub normal_texture: texture::Texture, // 변경!
     pub bind_group: wgpu::BindGroup,
 }
 ```
 
-We'll have to update the `texture_bind_group_layout` to include the normal map as well.
+노멀 맵도 포함하도록 `texture_bind_group_layout`을 업데이트해야 합니다.
 
 ```rust
 let texture_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
     entries: &[
         // ...
-        // normal map
+        // 노멀 맵
         wgpu::BindGroupLayoutEntry {
             binding: 2,
             visibility: wgpu::ShaderStages::FRAGMENT,
@@ -49,27 +49,27 @@ let texture_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroup
 });
 ```
 
-We'll need to load the normal map. We'll do this in the loop where we create the materials in the `load_model()` function in `resources.rs`.
+노멀 맵을 로드해야 합니다. `resources.rs`의 `load_model()` 함수에서 재질(material)을 생성하는 루프 안에서 이 작업을 수행할 것입니다.
 
 ```rust
 // resources.rs
 let mut materials = Vec::new();
 for m in obj_materials? {
     let diffuse_texture = load_texture(&m.diffuse_texture, device, queue).await?;
-    // NEW!
+    // 추가!
     let normal_texture = load_texture(&m.normal_texture, device, queue).await?;
 
     materials.push(model::Material::new(
         device,
         &m.name,
         diffuse_texture,
-        normal_texture, // NEW!
+        normal_texture, // 추가!
         layout,
     ));
 }
 ```
 
-You'll notice I'm using a `Material::new()` function we didn't have previously. Here's the code for that:
+이전에 없었던 `Material::new()` 함수를 사용하고 있는 것을 보실 수 있습니다. 해당 코드는 다음과 같습니다:
 
 ```rust
 impl Material {
@@ -77,7 +77,7 @@ impl Material {
         device: &wgpu::Device,
         name: &str,
         diffuse_texture: texture::Texture,
-        normal_texture: texture::Texture, // NEW!
+        normal_texture: texture::Texture, // 추가!
         layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -91,7 +91,7 @@ impl Material {
                     binding: 1,
                     resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
                 },
-                // NEW!
+                // 추가!
                 wgpu::BindGroupEntry {
                     binding: 2,
                     resource: wgpu::BindingResource::TextureView(&normal_texture.view),
@@ -107,17 +107,17 @@ impl Material {
         Self {
             name: String::from(name),
             diffuse_texture,
-            normal_texture, // NEW!
+            normal_texture, // 추가!
             bind_group,
         }
     }
 }
 ```
 
-Now, we can use the texture in the fragment shader.
+이제 프래그먼트 셰이더에서 텍스처를 사용할 수 있습니다.
 
 ```wgsl
-// Fragment shader
+// 프래그먼트 셰이더
 
 @group(0) @binding(0)
 var t_diffuse: texture_2d<f32>;
@@ -133,11 +133,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let object_color: vec4<f32> = textureSample(t_diffuse, s_diffuse, in.tex_coords);
     let object_normal: vec4<f32> = textureSample(t_normal, s_normal, in.tex_coords);
     
-    // We don't need (or want) much ambient light, so 0.1 is fine
+    // 앰비언트 라이트는 많이 필요하지 않으므로 0.1이면 충분합니다.
     let ambient_strength = 0.1;
     let ambient_color = light.color * ambient_strength;
 
-    // Create the lighting vectors
+    // 조명 벡터 생성
     let tangent_normal = object_normal.xyz * 2.0 - 1.0;
     let light_dir = normalize(light.position - in.world_position);
     let view_dir = normalize(camera.view_pos.xyz - in.world_position);
@@ -155,40 +155,40 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 }
 ```
 
-If we run the code now, you'll notice things don't look quite right. Let's compare our results with the last tutorial.
+이제 코드를 실행하면, 무언가 제대로 보이지 않는 것을 알 수 있습니다. 이전 튜토리얼의 결과와 비교해 봅시다.
 
 ![](./normal_mapping_wrong.png)
 ![](./ambient_diffuse_specular_lighting.png)
 
-Parts of the scene are dark when they should be lit up, and vice versa.
+밝아야 할 씬의 일부가 어두워지고, 그 반대의 경우도 발생합니다.
 
-## Tangent Space to World Space
+## 탄젠트 공간에서 월드 공간으로
 
-I mentioned briefly in the [lighting tutorial](/intermediate/tutorial10-lighting/#the-normal-matrix) that we were doing our lighting calculation in "world space". This meant that the entire scene was oriented with respect to the *world's* coordinate system. When we pull the normal data from our normal texture, all the normals are in what's known as pointing roughly in the positive z direction. That means that our lighting calculation thinks all of the surfaces of our models are facing in roughly the same direction. This is referred to as `tangent space`.
+[조명 튜토리얼](/intermediate/tutorial10-lighting/#the-normal-matrix)에서 '월드 공간(world space)'에서 조명 계산을 수행하고 있다고 간단히 언급했습니다. 이는 전체 씬이 *월드* 좌표계를 기준으로 방향이 정해져 있다는 의미였습니다. 노멀 텍스처에서 노멀 데이터를 가져올 때, 모든 노멀은 대략 양의 z 방향을 가리키는, 이른바 `탄젠트 공간(tangent space)`에 있습니다. 이는 우리의 조명 계산이 모델의 모든 표면이 대략 같은 방향을 향하고 있다고 생각하게 만듭니다.
 
-If we remember the [lighting-tutorial](/intermediate/tutorial10-lighting/#), we used the vertex normal to indicate the direction of the surface. It turns out we can use that to transform our normals from `tangent space` into `world space`. In order to do that, we need to draw from the depths of linear algebra.
+[조명 튜토리얼](/intermediate/tutorial10-lighting/#)을 다시 떠올려보면, 우리는 표면의 방향을 나타내기 위해 정점 노멀을 사용했습니다. 알고 보니, `탄젠트 공간`의 노멀을 `월드 공간`으로 변환하기 위해 그것을 사용할 수 있다는 것입니다. 그러기 위해서는 선형대수학의 깊은 곳을 참고해야 합니다.
 
-We can create a matrix that represents a coordinate system using three vectors that are perpendicular (or orthonormal) to each other. Basically, we define the x, y, and z axes of our coordinate system.
+우리는 서로 수직인 (또는 정규 직교하는) 세 개의 벡터를 사용하여 좌표계를 나타내는 행렬을 만들 수 있습니다. 기본적으로, 좌표계의 x, y, z 축을 정의하는 것입니다.
 
 ```wgsl
 let coordinate_system = mat3x3<f32>(
-    vec3(1, 0, 0), // x-axis (right)
-    vec3(0, 1, 0), // y-axis (up)
-    vec3(0, 0, 1)  // z-axis (forward)
+    vec3(1, 0, 0), // x축 (오른쪽)
+    vec3(0, 1, 0), // y축 (위)
+    vec3(0, 0, 1)  // z축 (앞)
 );
 ```
 
-We're going to create a matrix that will represent the coordinate space relative to our vertex normals. We're then going to use that to transform our normal map data to be in world space.
+우리는 정점 노멀을 기준으로 하는 좌표 공간을 나타내는 행렬을 만들 것입니다. 그리고 그 행렬을 사용하여 노멀 맵 데이터를 월드 공간으로 변환할 것입니다.
 
-## The tangent and the bitangent
+## 탄젠트(tangent)와 바이탄젠트(bitangent)
 
-We have one of the three vectors we need, the normal. What about the others? These are the tangent and bitangent vectors. A tangent represents any vector parallel with a surface (aka. doesn't intersect with it). The tangent is always perpendicular to the normal vector. The bitangent is a tangent vector that is perpendicular to the other tangent vector. Together, the tangent, bitangent, and normal represent the x, y, and z axes, respectively.
+필요한 세 벡터 중 하나인 노멀은 이미 있습니다. 나머지 둘은 무엇일까요? 바로 탄젠트와 바이탄젠트 벡터입니다. 탄젠트는 표면과 평행한(즉, 교차하지 않는) 모든 벡터를 나타냅니다. 탄젠트는 항상 노멀 벡터와 수직입니다. 바이탄젠트는 다른 탄젠트 벡터와 수직인 탄젠트 벡터입니다. 탄젠트, 바이탄젠트, 노멀은 함께 각각 x, y, z 축을 나타냅니다.
 
-Some model formats include the tangent and bitangent (sometimes called the binormal) in the vertex data, but OBJ does not. We'll have to calculate them manually. Luckily, we can derive our tangent and bitangent from our existing vertex data. Take a look at the following diagram.
+일부 모델 형식은 탄젠트와 바이탄젠트(때로는 바이노멀(binormal)이라고도 함)를 정점 데이터에 포함하지만, OBJ는 그렇지 않습니다. 우리가 직접 계산해야 합니다. 다행히 기존 정점 데이터로부터 탄젠트와 바이탄젠트를 유도할 수 있습니다. 다음 다이어그램을 살펴보세요.
 
 ![](./tangent_space.png)
 
-Basically, we can use the edges of our triangles and our normal to calculate the tangent and bitangent. But first, we need to update our `ModelVertex` struct in `model.rs`.
+기본적으로, 삼각형의 변과 노멀을 사용하여 탄젠트와 바이탄젠트를 계산할 수 있습니다. 하지만 먼저 `model.rs`의 `ModelVertex` 구조체를 업데이트해야 합니다.
 
 ```rust
 #[repr(C)]
@@ -197,13 +197,13 @@ pub struct ModelVertex {
     pub position: [f32; 3],
     pub tex_coords: [f32; 2],
     pub normal: [f32; 3],
-    // NEW!
+    // 추가!
     pub tangent: [f32; 3],
     pub bitangent: [f32; 3],
 }
 ```
 
-We'll need to upgrade our `VertexBufferLayout` as well.
+`VertexBufferLayout`도 업그레이드해야 합니다.
 
 ```rust
 impl Vertex for ModelVertex {
@@ -215,7 +215,7 @@ impl Vertex for ModelVertex {
             attributes: &[
                 // ...
 
-                // Tangent and bitangent
+                // 탄젠트와 바이탄젠트
                 wgpu::VertexAttribute {
                     offset: mem::size_of::<[f32; 8]>() as wgpu::BufferAddress,
                     shader_location: 3,
@@ -232,7 +232,7 @@ impl Vertex for ModelVertex {
 }
 ```
 
-Now, we can calculate the new tangent and bitangent vectors. Update the mesh generation in `load_model()` in `resource.rs` to use the following code:
+이제 새로운 탄젠트와 바이탄젠트 벡터를 계산할 수 있습니다. `resource.rs`의 `load_model()`에 있는 메쉬 생성 부분을 다음 코드를 사용하도록 업데이트하세요.
 
 ```rust
 let meshes = models
@@ -251,7 +251,7 @@ let meshes = models
                     m.mesh.normals[i * 3 + 1],
                     m.mesh.normals[i * 3 + 2],
                 ],
-                // We'll calculate these later
+                // 나중에 계산할 것입니다
                 tangent: [0.0; 3],
                 bitangent: [0.0; 3],
             })
@@ -260,9 +260,8 @@ let meshes = models
         let indices = &m.mesh.indices;
         let mut triangles_included = vec![0; vertices.len()];
 
-        // Calculate tangents and bitangets. We're going to
-        // use the triangles, so we need to loop through the
-        // indices in chunks of 3
+        // 탄젠트와 바이탄젠트를 계산합니다. 삼각형을 사용할 것이므로
+        // 인덱스를 3개씩 묶어서 순회해야 합니다.
         for c in indices.chunks(3) {
             let v0 = vertices[c[0] as usize];
             let v1 = vertices[c[1] as usize];
@@ -276,28 +275,27 @@ let meshes = models
             let uv1: cgmath::Vector2<_> = v1.tex_coords.into();
             let uv2: cgmath::Vector2<_> = v2.tex_coords.into();
 
-            // Calculate the edges of the triangle
+            // 삼각형의 변 계산
             let delta_pos1 = pos1 - pos0;
             let delta_pos2 = pos2 - pos0;
 
-            // This will give us a direction to calculate the
-            // tangent and bitangent
+            // 이것은 탄젠트와 바이탄젠트를 계산할 방향을 제공합니다.
             let delta_uv1 = uv1 - uv0;
             let delta_uv2 = uv2 - uv0;
 
-            // Solving the following system of equations will
-            // give us the tangent and bitangent.
+            // 다음 연립 방정식을 풀면
+            // 탄젠트와 바이탄젠트를 얻을 수 있습니다.
             //     delta_pos1 = delta_uv1.x * T + delta_u.y * B
             //     delta_pos2 = delta_uv2.x * T + delta_uv2.y * B
-            // Luckily, the place I found this equation provided
-            // the solution!
+            // 다행히 이 방정식을 찾은 곳에서
+            // 해법도 제공했습니다!
             let r = 1.0 / (delta_uv1.x * delta_uv2.y - delta_uv1.y * delta_uv2.x);
             let tangent = (delta_pos1 * delta_uv2.y - delta_pos2 * delta_uv1.y) * r;
-            // We flip the bitangent to enable right-handed normal
-            // maps with wgpu texture coordinate system
+            // wgpu 텍스처 좌표계에서 오른손 좌표계 노멀 맵을
+            // 사용하기 위해 바이탄젠트를 뒤집습니다.
             let bitangent = (delta_pos2 * delta_uv1.x - delta_pos1 * delta_uv2.x) * -r;
 
-            // We'll use the same tangent/bitangent for each vertex in the triangle
+            // 삼각형의 각 정점에 대해 동일한 탄젠트/바이탄젠트를 사용합니다.
             vertices[c[0] as usize].tangent =
                 (tangent + cgmath::Vector3::from(vertices[c[0] as usize].tangent)).into();
             vertices[c[1] as usize].tangent =
@@ -311,13 +309,13 @@ let meshes = models
             vertices[c[2] as usize].bitangent =
                 (bitangent + cgmath::Vector3::from(vertices[c[2] as usize].bitangent)).into();
 
-            // Used to average the tangents/bitangents
+            // 탄젠트/바이탄젠트의 평균을 내는 데 사용됩니다.
             triangles_included[c[0] as usize] += 1;
             triangles_included[c[1] as usize] += 1;
             triangles_included[c[2] as usize] += 1;
         }
 
-        // Average the tangents/bitangents
+        // 탄젠트/바이탄젠트의 평균을 냅니다.
         for (i, n) in triangles_included.into_iter().enumerate() {
             let denom = 1.0 / n as f32;
             let mut v = &mut vertices[i];
@@ -347,9 +345,9 @@ let meshes = models
     .collect::<Vec<_>>();
 ```
 
-## World Space to Tangent Space
+## 월드 공간에서 탄젠트 공간으로
 
-Since the normal map, by default, is in tangent space, we need to transform all the other variables used in that calculation to tangent space as well. We'll need to construct the tangent matrix in the vertex shader. First, we need our `VertexInput` to include the tangent and bitangents we calculated earlier.
+노멀 맵은 기본적으로 탄젠트 공간에 있으므로, 계산에 사용되는 다른 모든 변수들도 탄젠트 공간으로 변환해야 합니다. 정점 셰이더에서 탄젠트 행렬을 구성해야 합니다. 먼저 `VertexInput`에 우리가 이전에 계산한 탄젠트와 바이탄젠트를 포함시켜야 합니다.
 
 ```wgsl
 struct VertexInput {
@@ -361,13 +359,13 @@ struct VertexInput {
 };
 ```
 
-Next, we'll construct the `tangent_matrix` and then transform the vertex's light and view position into tangent space.
+다음으로, `tangent_matrix`를 구성한 다음 정점의 조명 위치와 시점 위치를 탄젠트 공간으로 변환할 것입니다.
 
 ```wgsl
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) tex_coords: vec2<f32>,
-    // UPDATED!
+    // 변경!
     @location(1) tangent_position: vec3<f32>,
     @location(2) tangent_light_position: vec3<f32>,
     @location(3) tangent_view_position: vec3<f32>,
@@ -385,7 +383,7 @@ fn vs_main(
         instance.normal_matrix_2,
     );
 
-    // Construct the tangent matrix
+    // 탄젠트 행렬 구성
     let world_normal = normalize(normal_matrix * model.normal);
     let world_tangent = normalize(normal_matrix * model.tangent);
     let world_bitangent = normalize(normal_matrix * model.bitangent);
@@ -407,35 +405,35 @@ fn vs_main(
 }
 ```
 
-Finally, we'll update the fragment shader to use these transformed lighting values.
+마지막으로, 프래그먼트 셰이더를 업데이트하여 이 변환된 조명 값들을 사용하도록 합니다.
 
 ```wgsl
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    // Sample textures..
+    // 텍스처 샘플링..
 
-    // Create the lighting vectors
+    // 조명 벡터 생성
     let tangent_normal = object_normal.xyz * 2.0 - 1.0;
     let light_dir = normalize(in.tangent_light_position - in.tangent_position);
     let view_dir = normalize(in.tangent_view_position - in.tangent_position);
 
-    // Perform lighting calculations...
+    // 조명 계산 수행...
 }
 ```
 
-We get the following from this calculation.
+이 계산을 통해 다음과 같은 결과를 얻습니다.
 
 ![](./normal_mapping_correct.png)
 
-## Srgb and normal textures
+## Srgb와 노멀 텍스처
 
-We've been using `Rgba8UnormSrgb` for all our textures. Srgb is a non-linear color space. It is ideal for monitors because human color perception isn't linear either and Srgb was designed to match the quirkiness of our human color perception.
+우리는 모든 텍스처에 `Rgba8UnormSrgb`를 사용해왔습니다. Srgb는 비선형 색 공간입니다. 인간의 색상 인식 또한 선형적이지 않고, Srgb는 인간 색상 인식의 특이점에 맞춰 설계되었기 때문에 모니터에 이상적입니다.
 
-But Srgb is an inappropriate color space for data that must be operated on mathematically. Such data should be in a linear (not gamma-corrected) color space. When a GPU samples a texture with Srgb in the name, it converts the data from non-linear gamma-corrected Srgb to a linear non-gamma-corrected color space first so that you can do math on it (and it does the opposite conversion if you write back to a Srgb texture).
+하지만 Srgb는 수학적으로 연산되어야 하는 데이터에는 부적합한 색 공간입니다. 이러한 데이터는 선형(감마 보정되지 않은) 색 공간에 있어야 합니다. GPU가 이름에 Srgb가 포함된 텍스처를 샘플링할 때, 수학적 연산을 할 수 있도록 데이터를 비선형 감마 보정된 Srgb에서 선형 비감마 보정 색 공간으로 먼저 변환합니다 (그리고 Srgb 텍스처에 다시 쓸 때는 반대 변환을 수행합니다).
 
-Normal maps are already stored in a linear format. So we should be specifying the linear space for the texture so it doesn't do an inappropriate conversion when we read from it.
+노멀 맵은 이미 선형 형식으로 저장되어 있습니다. 따라서 텍스처에 대해 선형 공간을 지정하여 읽을 때 부적절한 변환을 수행하지 않도록 해야 합니다.
 
-We need to specify `Rgba8Unorm` when we create the texture. Let's add an `is_normal_map` method to our Texture struct.
+텍스처를 생성할 때 `Rgba8Unorm`을 지정해야 합니다. `Texture` 구조체에 `is_normal_map` 메서드를 추가합시다.
 
 ```rust
 pub fn from_image(
@@ -443,10 +441,10 @@ pub fn from_image(
     queue: &wgpu::Queue,
     img: &image::DynamicImage,
     label: Option<&str>,
-    is_normal_map: bool, // NEW!
+    is_normal_map: bool, // 추가!
 ) -> Result<Self> {
     // ...
-    // NEW!
+    // 추가!
     let format = if is_normal_map {
         wgpu::TextureFormat::Rgba8Unorm
     } else {
@@ -454,11 +452,11 @@ pub fn from_image(
     };
     let texture = device.create_texture(&wgpu::TextureDescriptor {
         label,
-        is_surface_configured: false,
+        size: texture_size,
         mip_level_count: 1,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
-        // UPDATED!
+        // 변경!
         format,
         usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
         view_formats: &[],
@@ -474,7 +472,7 @@ pub fn from_image(
 }
 ```
 
-We'll need to propagate this change to the other methods that use this.
+이 변경 사항을 사용하는 다른 메서드에도 전파해야 합니다.
 
 ```rust
 pub fn from_bytes(
@@ -482,14 +480,14 @@ pub fn from_bytes(
     queue: &wgpu::Queue,
     bytes: &[u8],
     label: &str,
-    is_normal_map: bool, // NEW!
+    is_normal_map: bool, // 추가!
 ) -> Result<Self> {
     let img = image::load_from_memory(bytes)?;
-    Self::from_image(device, queue, &img, Some(label), is_normal_map) // UPDATED!
+    Self::from_image(device, queue, &img, Some(label), is_normal_map) // 변경!
 }
 ```
 
-We need to update `resource.rs` as well.
+`resource.rs`도 업데이트해야 합니다.
 
 ```rust
 pub async fn load_texture(
@@ -512,8 +510,8 @@ pub async fn load_model(
 
     let mut materials = Vec::new();
     for m in obj_materials? {
-        let diffuse_texture = load_texture(&m.diffuse_texture, false, device, queue).await?; // UDPATED!
-        let normal_texture = load_texture(&m.normal_texture, true, device, queue).await?; // UPDATED!
+        let diffuse_texture = load_texture(&m.diffuse_texture, false, device, queue).await?; // 변경!
+        let normal_texture = load_texture(&m.normal_texture, true, device, queue).await?; // 변경!
 
         materials.push(model::Material::new(
             device,
@@ -524,16 +522,15 @@ pub async fn load_model(
         ));
     }
 }
-
 ```
 
-That gives us the following.
+이렇게 하면 다음과 같은 결과가 나옵니다.
 
 ![](./no_srgb.png)
 
-## Unrelated stuff
+## 기타 내용
 
-I wanted to mess around with other materials so I added a `draw_model_instanced_with_material()` to the `DrawModel` trait.
+다른 재질로도 실험해보고 싶어서 `DrawModel` 트레이트에 `draw_model_instanced_with_material()`을 추가했습니다.
 
 ```rust
 pub trait DrawModel<'a> {
@@ -568,7 +565,7 @@ where
 }
 ```
 
-I found a cobblestone texture with a matching normal map and created a `debug_material` for that.
+조약돌 텍스처와 그에 맞는 노멀 맵을 찾아서 `debug_material`을 만들었습니다.
 
 ```rust
 // lib.rs
@@ -593,7 +590,7 @@ impl State {
 }
 ```
 
-Then, to render with the `debug_material`, I used the `draw_model_instanced_with_material()` that I created.
+그런 다음, `debug_material`로 렌더링하기 위해 제가 만든 `draw_model_instanced_with_material()`를 사용했습니다.
 
 ```rust
 render_pass.set_pipeline(&self.render_pipeline);
@@ -606,13 +603,13 @@ render_pass.draw_model_instanced_with_material(
 );
 ```
 
-That gives us something like this.
+그러면 다음과 같은 결과가 나옵니다.
 
 ![](./debug_material.png)
 
-You can find the textures I use in the GitHub Repository.
+제가 사용한 텍스처는 GitHub 저장소에서 찾을 수 있습니다.
 
-## Demo
+## 데모
 
 <WasmExample example="tutorial11_normals"></WasmExample>
 
