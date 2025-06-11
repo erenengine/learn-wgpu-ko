@@ -1,10 +1,10 @@
-# Features
+# 기능
 
-## Planned
-* Framebuffer
-* code download links
+## 계획된 기능
+*   프레임버퍼
+*   코드 다운로드 링크
 
-## Things I'd like
-* Screen shots
-* Create gifs of examples running (?)
-* Displaying random models as wireframe and solid
+## 희망 사항
+*   스크린샷
+*   예제 실행 모습 GIF로 만들기 (?)
+*   무작위 모델을 와이어프레임 및 솔리드 형태로 표시
